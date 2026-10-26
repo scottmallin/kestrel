@@ -217,7 +217,7 @@ export function useBoxTool(ctx: ToolContext): Tool {
 					.map((s) => s.outline);
 				const s = snap(
 					{ x: middle.x + normal.x * t, y: middle.y + normal.y * t },
-					{ outlines: others, tolerance },
+					{ outlines: others, tolerance, ...(grid && { grid }) },
 				);
 				if (s.kind !== "none")
 					t =
