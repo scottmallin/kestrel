@@ -57,13 +57,11 @@ describe("editor store", () => {
 			store.getState().perform({ type: "addSpace", space: box("a", 0) });
 			store.getState().select(["a"]);
 
-			store
-				.getState()
-				.perform({
-					type: "replaceSpaces",
-					remove: ["a"],
-					add: [box("a1", 0), box("a2", 10)],
-				});
+			store.getState().perform({
+				type: "replaceSpaces",
+				remove: ["a"],
+				add: [box("a1", 0), box("a2", 10)],
+			});
 
 			expect(store.getState().selection).toEqual([]);
 		});
