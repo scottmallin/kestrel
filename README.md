@@ -27,7 +27,8 @@ Requires Node 24+ and pnpm.
 pnpm install
 pnpm dev         # all apps in watch mode
 pnpm typecheck
-pnpm test
+pnpm test        # unit tests (Vitest)
+pnpm e2e         # browser tests (Playwright, uses the installed Microsoft Edge)
 pnpm build
 pnpm check       # Biome lint + format check (pnpm format to fix)
 ```
