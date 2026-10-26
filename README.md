@@ -2,7 +2,7 @@
 
 Self-serve indoor maps for venues: draw your premises, embed the map on your website.
 
-Start with [GLOSSARY.md](GLOSSARY.md) for the domain language, [docs/roadmap.md](docs/roadmap.md) for product decisions and [docs/adr/](docs/adr/) for architecture decisions.
+**Resuming work? Start with [docs/progress.md](docs/progress.md).** Then [GLOSSARY.md](GLOSSARY.md) for the domain language, [docs/roadmap.md](docs/roadmap.md) for product decisions and [docs/adr/](docs/adr/) for architecture decisions.
 
 ## Layout
 
@@ -12,8 +12,8 @@ Start with [GLOSSARY.md](GLOSSARY.md) for the domain language, [docs/roadmap.md]
 | `apps/editor`       | React + react-konva map editor                   |
 | `apps/embed`        | MapLibre viewer served as the Embed              |
 | `apps/web`          | Astro marketing site                             |
-| `packages/domain`   | Domain types and Operations                      |
-| `packages/geometry` | Polygon maths and snapping                       |
+| `packages/domain`   | Domain types, Operations and undo/redo History   |
+| `packages/geometry` | Snapping, split/merge/overlaps, Magic fill       |
 | `packages/publish`  | Compiles a Draft into a Published Version bundle |
 | `packages/ui`       | Shared React components                          |
 

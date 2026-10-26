@@ -1,6 +1,6 @@
 # Roadmap & product decisions
 
-Working record of product and stack decisions from design sessions. Use GLOSSARY.md for terms and docs/adr/ for hard-to-reverse architecture decisions.
+Working record of product and stack decisions from design sessions. Use GLOSSARY.md for terms and docs/adr/ for hard-to-reverse architecture decisions. For build status and what to do next, see [progress.md](progress.md).
 
 ## Codename
 
@@ -75,7 +75,7 @@ Working record of product and stack decisions from design sessions. Use GLOSSARY
 
 - **Repo**: pnpm + Turborepo monorepo: `apps/{api, editor, embed, web}`, `packages/{domain, geometry, publish, ui}`. A `platform` package splits out when the second suite app arrives.
 
-- **Editor**: React + react-konva + Vite single-page app, TanStack Router/Query, Zustand. Every edit goes through the Operation layer (undo/redo, path to multiplayer).
+- **Editor**: React + react-konva + Vite single-page app, Zustand (TanStack Router/Query to come with the API). Every edit goes through Operations (ADR 0004). Unit tests with Vitest; browser tests with Playwright against the installed Edge.
 - **Embed**: separate small Vite bundle (MapLibre GL + vanilla TS or Preact), delivered as an iframe with deep-link URL parameters.
 - **Marketing site**: Astro.
 - **API**: Fastify + Drizzle on Postgres (Neon). No PostGIS yet.
