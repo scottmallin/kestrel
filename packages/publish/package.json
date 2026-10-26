@@ -1,0 +1,16 @@
+{
+	"name": "@kestrel/publish",
+	"description": "Compiles a Draft into a Published Version bundle",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@kestrel/domain": "workspace:*"
+	}
+}
