@@ -14,3 +14,4 @@ export function polygonArea(polygon: Polygon): number {
 	}
 	return Math.abs(twiceArea) / 2;
 }
+export * from "./snap.ts";
