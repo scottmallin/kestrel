@@ -15,7 +15,7 @@ Every edit to a Draft goes through an Operation (see GLOSSARY.md). We needed und
 
 ## Decision
 
-- An Operation records its **result**. Split and merge are both `replaceSpaces`, with the shapes worked out by the editor using `packages/geometry`. The domain package never depends on the geometry library.
+- An Operation records its **result**. Split and merge are both `replaceSpaces`, with the shapes worked out by the editor using `packages/geometry`. `packages/domain` uses only geometry's types, never its code or the polygon-clipping library.
 - `applyOperation(draft, operation)` is pure and returns the new Draft **plus the inverse Operation**, captured from the Draft as it was. Invalid Operations are rejected with an error and change nothing.
 - `History` keeps a stack of inverses. Undo applies the top inverse and keeps _its_ inverse as the redo step. Performing a new Operation clears redo.
 - The set is small and general: `addSpace`, `removeSpaces`, `replaceSpaces`, `reshapeSpace` and `updateSpace`. The inverse of `removeSpaces` is a `replaceSpaces` that removes nothing and adds the Spaces back.
