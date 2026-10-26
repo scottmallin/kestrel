@@ -242,6 +242,43 @@ importers:
         specifier: ^0.31.11
         version: 0.31.11
 
+  apps/editor:
+    dependencies:
+      "@kestrel/domain":
+        specifier: workspace:*
+        version: link:../../packages/domain
+      "@kestrel/geometry":
+        specifier: workspace:*
+        version: link:../../packages/geometry
+      konva:
+        specifier: ^10.9.0
+        version: 10.9.0
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+      react-konva:
+        specifier: ^19.3.2
+        version: 19.3.2(@types/react@19.3.0)(konva@10.9.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      zustand:
+        specifier: ^5.0.16
+        version: 5.0.16(@types/react@19.3.0)(react@19.3.1)
+    devDependencies:
+      "@types/react":
+        specifier: ^19.3.0
+        version: 19.3.0
+      "@types/react-dom":
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      "@vitejs/plugin-react":
+        specifier: ^6.1.2
+        version: 6.1.2(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
+      vite:
+        specifier: ^8.3.5
+        version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
+
   packages/domain:
     dependencies:
       "@kestrel/geometry":
@@ -1339,6 +1376,36 @@ packages:
         integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==,
       }
 
+  "@types/react-dom@19.3.0":
+    resolution:
+      {
+        integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==,
+      }
+    peerDependencies:
+      "@types/react": ^19.3.0
+
+  "@types/react-reconciler@0.28.9":
+    resolution:
+      {
+        integrity: sha512-HHM3nxyUZ3zAylX8ZEyrDNd2XZOnQ0D5XfunJF5FLQnZbHHYq4UWvW1QfelQNXv1ICNkwYhfxjwfnqivYB6bFg==,
+      }
+    peerDependencies:
+      "@types/react": "*"
+
+  "@types/react-reconciler@0.34.0":
+    resolution:
+      {
+        integrity: sha512-zVDzX0Fk1XgDP2IutTpSrxd57jwOHlX3rlPrFz68Sc+06tpgOFRlqSUK2ZiqQeQXqnIfUb2cfJQUupXBKy498w==,
+      }
+    peerDependencies:
+      "@types/react": "*"
+
+  "@types/react@19.3.0":
+    resolution:
+      {
+        integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==,
+      }
+
   "@typescript/typescript-aix-ppc64@7.0.2":
     resolution:
       {
@@ -1519,6 +1586,25 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  "@vitejs/plugin-react@6.1.2":
+    resolution:
+      {
+        integrity: sha512-fhJNGUdscQa4HkI0xFxwonWyhnVReCPDbXI7FH7jmzpnVCrFQI7PRrhWecO263610vOrs9tr2Y4xcf8uAdFxbw==,
+      }
+    engines: { node: ^20.19.0 || >=22.12.0 }
+    peerDependencies:
+      "@rolldown/plugin-babel": ^0.1.7 || ^0.2.0
+      babel-plugin-react-compiler: ^1.0.0
+      oxc-transform-react: ^0.152.0
+      vite: ^8.0.0
+    peerDependenciesMeta:
+      "@rolldown/plugin-babel":
+        optional: true
+      babel-plugin-react-compiler:
+        optional: true
+      oxc-transform-react:
+        optional: true
+
   "@vitest/mocker@5.0.5":
     resolution:
       {
@@ -1596,6 +1682,12 @@ packages:
         integrity: sha512-yuToqVvRrj6pfDXREyQAAv8SkAEk/8GS3jQRTiUMm66TVtBYmqQeoEjL2Lmq8Rpo6271vH76InTChTitEAm65w==,
       }
     engines: { node: ">=22" }
+
+  csstype@3.2.3:
+    resolution:
+      {
+        integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==,
+      }
 
   dequal@2.0.3:
     resolution:
@@ -1847,6 +1939,14 @@ packages:
       }
     engines: { node: ">= 10" }
 
+  its-fine@2.1.1:
+    resolution:
+      {
+        integrity: sha512-C5ZoVkeqSt0Aje0tzESO+iT/EQpNFNL39GkP7mCACtoZUFD6GcyerFCr6kp0ZtiII4W9HoYkY48Soy5xE/uHKw==,
+      }
+    peerDependencies:
+      react: ^19.0.0
+
   json-schema-ref-resolver@3.0.1:
     resolution:
       {
@@ -1858,6 +1958,20 @@ packages:
       {
         integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==,
       }
+
+  konva@10.9.0:
+    resolution:
+      {
+        integrity: sha512-3NOOlcbimFDp4+/DfXGTBkfn3cn3VP1BESPySQ6ayCzgMA9JSMGJNNxeIKw5jpHL6SAl6gHsrv10DUEjNRL0Qg==,
+      }
+    peerDependencies:
+      canvas: ^3.0.0
+      skia-canvas: ^3.0.0
+    peerDependenciesMeta:
+      canvas:
+        optional: true
+      skia-canvas:
+        optional: true
 
   light-my-request@6.8.0:
     resolution:
@@ -2061,6 +2175,40 @@ packages:
         integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==,
       }
 
+  react-dom@19.3.1:
+    resolution:
+      {
+        integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==,
+      }
+    peerDependencies:
+      react: ^19.3.1
+
+  react-konva@19.3.2:
+    resolution:
+      {
+        integrity: sha512-Uv0xlWoRSCByHinqs/03SFL8E28fYbe59sQ+2EJpwa1O4Zlz0+T+8DaKwlma9C2rkYwYj6j8eHD41F5oJafagg==,
+      }
+    peerDependencies:
+      konva: ^8.0.1 || ^7.2.5 || ^9.0.0 || ^10.0.0
+      react: ^19.3.0
+      react-dom: ^19.3.0
+
+  react-reconciler@0.34.0:
+    resolution:
+      {
+        integrity: sha512-eVibvB1fc9j5Qf1KRkiM3GzRPBdjg2P6G6QV2f3P6Eb3OGMxRBhdg2rrUwjbV5JrQaJj8nOa8uajmmJA5tJWjQ==,
+      }
+    engines: { node: ">=0.10.0" }
+    peerDependencies:
+      react: ^19.3.0
+
+  react@19.3.1:
+    resolution:
+      {
+        integrity: sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw==,
+      }
+    engines: { node: ">=0.10.0" }
+
   real-require@1.0.0:
     resolution:
       {
@@ -2121,6 +2269,12 @@ packages:
         integrity: sha512-b3rppTKm9T+PsVCBEOUR46GWI7fdOs00VKZ1+9c1EWDaDMvjQc6tUwuFyIprgGgTcWoVHSKrU8H31ZHA2e0RHA==,
       }
     engines: { node: ">=10" }
+
+  scheduler@0.28.0:
+    resolution:
+      {
+        integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==,
+      }
 
   secure-json-parse@4.1.1:
     resolution:
@@ -2342,6 +2496,27 @@ packages:
       }
     engines: { node: ">=20.11" }
     hasBin: true
+
+  zustand@5.0.16:
+    resolution:
+      {
+        integrity: sha512-Uv7e327ihlCfayfja3hDc0M64Upev1LWBKpRobdK4NyovDDPeeX4imWXc/wzC1yc6fkYPoAY/ncKVPAs2jrtQw==,
+      }
+    engines: { node: ">=12.20.0" }
+    peerDependencies:
+      "@types/react": ">=18.0.0"
+      immer: ">=9.0.6"
+      react: ">=18.0.0"
+      use-sync-external-store: ">=1.2.0"
+    peerDependenciesMeta:
+      "@types/react":
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
 
 snapshots:
   "@biomejs/biome@2.6.3":
@@ -2737,6 +2912,22 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
+  "@types/react-dom@19.3.0(@types/react@19.3.0)":
+    dependencies:
+      "@types/react": 19.3.0
+
+  "@types/react-reconciler@0.28.9(@types/react@19.3.0)":
+    dependencies:
+      "@types/react": 19.3.0
+
+  "@types/react-reconciler@0.34.0(@types/react@19.3.0)":
+    dependencies:
+      "@types/react": 19.3.0
+
+  "@types/react@19.3.0":
+    dependencies:
+      csstype: 3.2.3
+
   "@typescript/typescript-aix-ppc64@7.0.2":
     optional: true
 
@@ -2797,6 +2988,11 @@ snapshots:
   "@typescript/typescript-win32-x64@7.0.2":
     optional: true
 
+  "@vitejs/plugin-react@6.1.2(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))":
+    dependencies:
+      "@rolldown/pluginutils": 1.0.1
+      vite: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
+
   "@vitest/mocker@5.0.5(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))":
     dependencies:
       "@jridgewell/trace-mapping": 0.3.31
@@ -2835,6 +3031,8 @@ snapshots:
   chai@6.3.0: {}
 
   cookie@2.0.1: {}
+
+  csstype@3.2.3: {}
 
   dequal@2.0.3: {}
 
@@ -3004,11 +3202,20 @@ snapshots:
 
   ipaddr.js@2.5.0: {}
 
+  its-fine@2.1.1(@types/react@19.3.0)(react@19.3.1):
+    dependencies:
+      "@types/react-reconciler": 0.28.9(@types/react@19.3.0)
+      react: 19.3.1
+    transitivePeerDependencies:
+      - "@types/react"
+
   json-schema-ref-resolver@3.0.1:
     dependencies:
       dequal: 2.0.3
 
   json-schema-traverse@1.0.0: {}
+
+  konva@10.9.0: {}
 
   light-my-request@6.8.0:
     dependencies:
@@ -3112,6 +3319,30 @@ snapshots:
 
   quick-format-unescaped@4.0.4: {}
 
+  react-dom@19.3.1(react@19.3.1):
+    dependencies:
+      react: 19.3.1
+      scheduler: 0.28.0
+
+  react-konva@19.3.2(@types/react@19.3.0)(konva@10.9.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
+    dependencies:
+      "@types/react-reconciler": 0.34.0(@types/react@19.3.0)
+      its-fine: 2.1.1(@types/react@19.3.0)(react@19.3.1)
+      konva: 10.9.0
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+      react-reconciler: 0.34.0(react@19.3.1)
+      scheduler: 0.28.0
+    transitivePeerDependencies:
+      - "@types/react"
+
+  react-reconciler@0.34.0(react@19.3.1):
+    dependencies:
+      react: 19.3.1
+      scheduler: 0.28.0
+
+  react@19.3.1: {}
+
   real-require@1.0.0: {}
 
   require-from-string@2.0.2: {}
@@ -3150,6 +3381,8 @@ snapshots:
       ret: 0.5.1
 
   safe-stable-stringify@2.5.0: {}
+
+  scheduler@0.28.0: {}
 
   secure-json-parse@4.1.1: {}
 
@@ -3264,3 +3497,8 @@ snapshots:
       - msw
 
   why-is-node-running@3.2.1: {}
+
+  zustand@5.0.16(@types/react@19.3.0)(react@19.3.1):
+    optionalDependencies:
+      "@types/react": 19.3.0
+      react: 19.3.1
