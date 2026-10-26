@@ -14,6 +14,8 @@ export type TraceResult =
 export type TraceOptions = {
 	/** Openings in walls up to this many pixels wide are treated as closed, so the fill stays in the room. */
 	readonly doorGap?: number;
+	/** Outlines of Spaces already drawn; the fill treats them as walls. */
+	readonly occupied?: readonly Polygon[];
 };
 
 /** Finds the room containing seed and returns its outline in pixel coordinates. */
@@ -26,13 +28,18 @@ export function traceRoom(
 	const y = Math.round(seed.y);
 	if (x < 0 || y < 0 || x >= mask.width || y >= mask.height)
 		return { ok: false, reason: "Click inside the plan." };
-	if (mask.walls[y * mask.width + x]) {
+	const { width, height } = mask;
+	const occupied = options.occupied ?? [];
+	if (occupied.some((outline) => contains(outline, seed))) {
+		return { ok: false, reason: "That spot is already part of a Space." };
+	}
+	const walls = withOccupied(mask, occupied);
+	if (walls[y * width + x]) {
 		return {
 			ok: false,
 			reason: "That spot is on a wall. Click further inside the room.",
 		};
 	}
-	const { width, height, walls } = mask;
 	// Thicken walls by half the door gap so doorways close, fill, then grow back out to the real walls.
 	const radius = Math.round((options.doorGap ?? 0) / 2);
 	const blocked = radius > 0 ? dilate(walls, width, height, radius) : walls;
@@ -51,11 +58,58 @@ export function traceRoom(
 		radius > 0
 			? dilate(region, width, height, radius).map((v, i) => (walls[i] ? 0 : v))
 			: region;
+	const outline = traceOutline(room, width, height);
 	return {
 		ok: true,
-		outline: removeStraightCorners(traceOutline(room, width, height)),
+		outline: removeStraightCorners(
+			squareUp(simplify(outline, SIMPLIFY_PIXELS), SQUARE_UP_DEGREES),
+		),
 	};
 }
+
+/** The mask's walls plus every pixel whose centre lies inside an occupied outline. */
+function withOccupied(
+	mask: WallMask,
+	occupied: readonly Polygon[],
+): Uint8Array {
+	if (occupied.length === 0) return mask.walls;
+	const walls = mask.walls.slice();
+	for (const outline of occupied) {
+		const xs = outline.map((p) => p.x);
+		const ys = outline.map((p) => p.y);
+		const x0 = Math.max(0, Math.floor(Math.min(...xs)));
+		const x1 = Math.min(mask.width - 1, Math.ceil(Math.max(...xs)));
+		const y0 = Math.max(0, Math.floor(Math.min(...ys)));
+		const y1 = Math.min(mask.height - 1, Math.ceil(Math.max(...ys)));
+		for (let y = y0; y <= y1; y++) {
+			for (let x = x0; x <= x1; x++) {
+				if (contains(outline, { x: x + 0.5, y: y + 0.5 }))
+					walls[y * mask.width + x] = 1;
+			}
+		}
+	}
+	return walls;
+}
+
+/** Even-odd point-in-polygon test. */
+function contains(outline: Polygon, p: Point): boolean {
+	let inside = false;
+	for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+		const a = outline[i] as Point;
+		const b = outline[j] as Point;
+		if (
+			a.y > p.y !== b.y > p.y &&
+			p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x
+		)
+			inside = !inside;
+	}
+	return inside;
+}
+
+/** Wiggles smaller than this (in pixels) are smoothed out of traced outlines. */
+const SIMPLIFY_PIXELS = 1.5;
+/** Edges within this many degrees of horizontal or vertical are made exactly so. */
+const SQUARE_UP_DEGREES = 10;
 
 /** A room covering more of the plan than this is assumed to be a leak. */
 const MAX_ROOM_SHARE = 0.4;
@@ -201,4 +255,61 @@ function removeStraightCorners(outline: readonly Point[]): Point[] {
 			) > 1e-9
 		);
 	});
+}
+
+/** Ramer–Douglas–Peucker simplification of a closed ring. */
+function simplify(ring: readonly Point[], tolerance: number): Point[] {
+	if (ring.length < 4) return [...ring];
+	// Split at the corner farthest from the first, so each half has two fixed ends.
+	const first = ring[0] as Point;
+	let far = 0;
+	ring.forEach((p, i) => {
+		if (distance(p, first) > distance(ring[far] as Point, first)) far = i;
+	});
+	const there = simplifyPath(ring.slice(0, far + 1), tolerance);
+	const back = simplifyPath([...ring.slice(far), first], tolerance);
+	return [...there.slice(0, -1), ...back.slice(0, -1)];
+}
+
+function simplifyPath(path: readonly Point[], tolerance: number): Point[] {
+	const a = path[0] as Point;
+	const b = path.at(-1) as Point;
+	let farthest = 0;
+	let index = 0;
+	for (let i = 1; i < path.length - 1; i++) {
+		const d = distanceToLine(path[i] as Point, a, b);
+		if (d > farthest) {
+			farthest = d;
+			index = i;
+		}
+	}
+	if (farthest <= tolerance) return [a, b];
+	return [
+		...simplifyPath(path.slice(0, index + 1), tolerance).slice(0, -1),
+		...simplifyPath(path.slice(index), tolerance),
+	];
+}
+
+/** Makes near-horizontal and near-vertical edges exactly so, by averaging their ends. */
+function squareUp(ring: readonly Point[], maxDegrees: number): Point[] {
+	const out = ring.map((p): { x: number; y: number } => ({ ...p }));
+	const slope = Math.tan((maxDegrees * Math.PI) / 180);
+	out.forEach((a, i) => {
+		const b = out[(i + 1) % out.length] as { x: number; y: number };
+		const dx = Math.abs(b.x - a.x);
+		const dy = Math.abs(b.y - a.y);
+		if (dy <= dx * slope) a.y = b.y = (a.y + b.y) / 2;
+		else if (dx <= dy * slope) a.x = b.x = (a.x + b.x) / 2;
+	});
+	return out;
+}
+
+const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+
+function distanceToLine(p: Point, a: Point, b: Point): number {
+	const length = distance(a, b);
+	if (length === 0) return distance(p, a);
+	return (
+		Math.abs((b.x - a.x) * (a.y - p.y) - (a.x - p.x) * (b.y - a.y)) / length
+	);
 }

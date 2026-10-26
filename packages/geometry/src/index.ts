@@ -16,3 +16,4 @@ export function polygonArea(polygon: Polygon): number {
 }
 export * from "./boolean.ts";
 export * from "./snap.ts";
+export * from "./trace.ts";

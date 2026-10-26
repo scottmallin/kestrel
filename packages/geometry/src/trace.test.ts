@@ -109,4 +109,72 @@ describe("traceRoom", () => {
 			expect(result.ok && result.outline).toContainEqual({ x: 59, y: 49 });
 		});
 	});
+
+	it("tidies rough, scanned-looking walls into a clean rectangle", () => {
+		const p = plan(100, 80);
+		p.room(10, 10, 60, 50);
+		// Single-pixel specks along the inside of the right and bottom walls.
+		for (let y = 15; y < 48; y += 5) p.wall(58, y, 58, y);
+		for (let x = 15; x < 58; x += 7) p.wall(x, 48, x, 48);
+
+		const result = traceRoom(p.mask, { x: 30, y: 30 });
+
+		expect(result.ok && result.outline).toHaveLength(4);
+		for (const ideal of [
+			{ x: 12, y: 12 },
+			{ x: 59, y: 12 },
+			{ x: 59, y: 49 },
+			{ x: 12, y: 49 },
+		]) {
+			const nearest = result.ok
+				? Math.min(
+						...result.outline.map((c) =>
+							Math.hypot(c.x - ideal.x, c.y - ideal.y),
+						),
+					)
+				: Infinity;
+			expect(nearest).toBeLessThanOrEqual(1);
+		}
+	});
+
+	it("treats Spaces already drawn as walls", () => {
+		const p = plan(100, 80);
+		p.room(10, 10, 60, 50);
+		const leftHalf = [
+			{ x: 12, y: 12 },
+			{ x: 36, y: 12 },
+			{ x: 36, y: 49 },
+			{ x: 12, y: 49 },
+		];
+
+		const result = traceRoom(
+			p.mask,
+			{ x: 50, y: 30 },
+			{ occupied: [leftHalf] },
+		);
+
+		expect(
+			result.ok && [...result.outline].sort((a, b) => a.x - b.x || a.y - b.y),
+		).toEqual([
+			{ x: 36, y: 12 },
+			{ x: 36, y: 49 },
+			{ x: 59, y: 12 },
+			{ x: 59, y: 49 },
+		]);
+	});
+
+	it("says so when the click is inside a Space already drawn", () => {
+		const p = plan(100, 80);
+		p.room(10, 10, 60, 50);
+		const whole = [
+			{ x: 12, y: 12 },
+			{ x: 59, y: 12 },
+			{ x: 59, y: 49 },
+			{ x: 12, y: 49 },
+		];
+		expect(traceRoom(p.mask, { x: 30, y: 30 }, { occupied: [whole] })).toEqual({
+			ok: false,
+			reason: "That spot is already part of a Space.",
+		});
+	});
 });
