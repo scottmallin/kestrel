@@ -12,7 +12,8 @@
 		"typecheck": "turbo run typecheck",
 		"test": "turbo run test",
 		"check": "biome check .",
-		"format": "biome check --write ."
+		"format": "biome check --write .",
+		"prototype:drawing": "pnpm --filter @kestrel/editor exec vite --open \"/?prototype=drawing&variant=A\""
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.6.3",

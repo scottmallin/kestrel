@@ -1,1 +1,1 @@
-export {};
+export { PrototypeSwitcher } from "./PrototypeSwitcher.tsx";

@@ -12,7 +12,9 @@
 	"dependencies": {
 		"@kestrel/domain": "workspace:*",
 		"@kestrel/geometry": "workspace:*",
+		"@kestrel/ui": "workspace:*",
 		"konva": "^10.9.0",
+		"polygon-clipping": "^0.15.7",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1",
 		"react-konva": "^19.3.2",

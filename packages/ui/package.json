@@ -9,5 +9,12 @@
 	"scripts": {
 		"typecheck": "tsc",
 		"test": "vitest run --passWithNoTests"
+	},
+	"devDependencies": {
+		"@types/react": "^19.3.0",
+		"react": "^19.3.1"
+	},
+	"peerDependencies": {
+		"react": "^19"
 	}
 }
