@@ -140,6 +140,14 @@ describe("snap", () => {
 			});
 		});
 
+		it("still rounds the other axis when a point aligns on one", () => {
+			const result = snap(
+				{ x: 23.96, y: 8.3 },
+				{ outlines: [room], tolerance: 0.5, grid: 0.5 },
+			);
+			expect(result).toMatchObject({ point: { x: 24, y: 8 }, kind: "align" });
+		});
+
 		it("gives way to corners", () => {
 			expect(
 				snap({ x: 10.3, y: 0.3 }, { outlines: [room], tolerance: 0.5, grid: 4 })

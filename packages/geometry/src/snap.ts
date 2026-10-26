@@ -67,20 +67,31 @@ export function snap(point: Point, context: SnapContext): Snap {
 
 	// A straightened line already fixes x (vertical), y (horizontal) or both (diagonal).
 	const direction = straightened?.direction;
-	if (direction !== "vertical" && direction !== "diagonal")
-		result = align(result, "x", corners, context.tolerance);
-	if (direction !== "horizontal" && direction !== "diagonal")
-		result = align(result, "y", corners, context.tolerance);
+	let fixedX = direction === "vertical" || direction === "diagonal";
+	let fixedY = direction === "horizontal" || direction === "diagonal";
+	if (!fixedX) {
+		const aligned = align(result, "x", corners, context.tolerance);
+		fixedX = aligned !== result;
+		result = aligned;
+	}
+	if (!fixedY) {
+		const aligned = align(result, "y", corners, context.tolerance);
+		fixedY = aligned !== result;
+		result = aligned;
+	}
 
+	// The grid rounds whichever axes nothing else has fixed.
 	const { grid } = context;
-	if (result.kind === "none" && grid) {
+	if (grid && !(fixedX && fixedY)) {
+		const p = result.point;
+		const gridded = {
+			x: fixedX ? p.x : Math.round(p.x / grid) * grid,
+			y: fixedY ? p.y : Math.round(p.y / grid) * grid,
+		};
 		return {
-			point: {
-				x: Math.round(point.x / grid) * grid,
-				y: Math.round(point.y / grid) * grid,
-			},
-			kind: "grid",
-			guides: [],
+			point: gridded,
+			kind: result.kind === "none" ? "grid" : result.kind,
+			guides: result.guides.map(([from]) => [from, gridded] as const),
 		};
 	}
 	return result;

@@ -1,4 +1,4 @@
-import type { Point, Polygon } from "./index.ts";
+import { containsPoint, type Point, type Polygon } from "./index.ts";
 
 /** A floor plan reduced to pixels: walls[y * width + x] is 1 for wall, 0 for open floor. */
 export type WallMask = {
@@ -30,7 +30,7 @@ export function traceRoom(
 		return { ok: false, reason: "Click inside the plan." };
 	const { width, height } = mask;
 	const occupied = options.occupied ?? [];
-	if (occupied.some((outline) => contains(outline, seed))) {
+	if (occupied.some((outline) => containsPoint(outline, seed))) {
 		return { ok: false, reason: "That spot is already part of a Space." };
 	}
 	const walls = withOccupied(mask, occupied);
@@ -83,27 +83,12 @@ function withOccupied(
 		const y1 = Math.min(mask.height - 1, Math.ceil(Math.max(...ys)));
 		for (let y = y0; y <= y1; y++) {
 			for (let x = x0; x <= x1; x++) {
-				if (contains(outline, { x: x + 0.5, y: y + 0.5 }))
+				if (containsPoint(outline, { x: x + 0.5, y: y + 0.5 }))
 					walls[y * mask.width + x] = 1;
 			}
 		}
 	}
 	return walls;
-}
-
-/** Even-odd point-in-polygon test. */
-function contains(outline: Polygon, p: Point): boolean {
-	let inside = false;
-	for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
-		const a = outline[i] as Point;
-		const b = outline[j] as Point;
-		if (
-			a.y > p.y !== b.y > p.y &&
-			p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x
-		)
-			inside = !inside;
-	}
-	return inside;
 }
 
 /** Wiggles smaller than this (in pixels) are smoothed out of traced outlines. */

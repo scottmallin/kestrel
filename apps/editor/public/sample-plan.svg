@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <title>Sample shopping-centre floor plan</title>
+  <!-- Dark walls, door gaps, grey labels. 20px = 1m. -->
+  <rect width="1200" height="800" fill="#fff"/>
+  <g fill="none" stroke="#111" stroke-width="4">
+    <rect x="40" y="40" width="1120" height="720"/>
+    <rect x="40" y="40" width="224" height="320"/>
+    <rect x="264" y="40" width="224" height="320"/>
+    <rect x="488" y="40" width="224" height="320"/>
+    <rect x="712" y="40" width="224" height="320"/>
+    <rect x="936" y="40" width="224" height="320"/>
+    <rect x="40" y="440" width="224" height="320"/>
+    <rect x="264" y="440" width="224" height="320"/>
+    <rect x="488" y="440" width="224" height="320"/>
+    <path d="M712 440 H1040 V600 H1160 V760 H712 Z"/>
+    <rect x="1040" y="440" width="120" height="160"/>
+  </g>
+  <g fill="#fff">
+    <rect x="134" y="356" width="36" height="8"/>
+    <rect x="358" y="356" width="36" height="8"/>
+    <rect x="582" y="356" width="36" height="8"/>
+    <rect x="806" y="356" width="36" height="8"/>
+    <rect x="1030" y="356" width="36" height="8"/>
+    <rect x="134" y="436" width="36" height="8"/>
+    <rect x="358" y="436" width="36" height="8"/>
+    <rect x="582" y="436" width="36" height="8"/>
+    <rect x="840" y="436" width="60" height="8"/>
+    <rect x="1036" y="500" width="8" height="30"/>
+    <rect x="36" y="380" width="8" height="40"/>
+    <rect x="1156" y="380" width="8" height="40"/>
+  </g>
+  <g fill="#999" font-family="sans-serif" font-size="16" text-anchor="middle">
+    <text x="152" y="200">Unit 1</text><text x="376" y="200">Unit 2</text><text x="600" y="200">Unit 3</text>
+    <text x="824" y="200">Unit 4</text><text x="1048" y="200">Unit 5</text>
+    <text x="152" y="600">Unit 6</text><text x="376" y="600">Unit 7</text><text x="600" y="600">Unit 8</text>
+    <text x="880" y="640">Anchor store</text><text x="1100" y="525">WC</text>
+    <text x="600" y="405">Mall corridor</text>
+  </g>
+</svg>

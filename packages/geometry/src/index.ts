@@ -14,6 +14,22 @@ export function polygonArea(polygon: Polygon): number {
 	}
 	return Math.abs(twiceArea) / 2;
 }
+
+/** Whether p lies inside the outline (even-odd rule). */
+export function containsPoint(outline: Polygon, p: Point): boolean {
+	let inside = false;
+	for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+		const a = outline[i] as Point;
+		const b = outline[j] as Point;
+		if (
+			a.y > p.y !== b.y > p.y &&
+			p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x
+		)
+			inside = !inside;
+	}
+	return inside;
+}
+
 export * from "./boolean.ts";
 export * from "./snap.ts";
 export * from "./trace.ts";
