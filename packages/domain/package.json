@@ -1,0 +1,16 @@
+{
+	"name": "@kestrel/domain",
+	"description": "Kestrel domain types and Operations",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@kestrel/geometry": "workspace:*"
+	}
+}

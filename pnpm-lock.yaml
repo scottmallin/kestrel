@@ -223,6 +223,22 @@ importers:
         specifier: ^5.0.5
         version: 5.0.5(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5))
 
+  packages/domain:
+    dependencies:
+      "@kestrel/geometry":
+        specifier: workspace:*
+        version: link:../geometry
+
+  packages/geometry: {}
+
+  packages/publish:
+    dependencies:
+      "@kestrel/domain":
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/ui: {}
+
 packages:
   "@biomejs/biome@2.6.3":
     resolution:

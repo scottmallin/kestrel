@@ -1,0 +1,13 @@
+{
+	"name": "@kestrel/geometry",
+	"description": "Polygon maths and snapping for drawing Spaces",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc",
+		"test": "vitest run --passWithNoTests"
+	}
+}
