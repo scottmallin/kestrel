@@ -54,18 +54,18 @@ Working record of product and stack decisions from design sessions. Use GLOSSARY
 
 ## Draft Plans (GBP/month, per Organisation, to be tuned)
 
-| | Free | Starter (~£19) | Pro (~£79) | Enterprise |
-|---|---|---|---|---|
-| Maps | 1 | 1 | 5 | ∞ |
-| Buildings / Levels | 1 / 1 | 1 / 5 | ∞ | ∞ |
-| Spaces | ~30 | 300 | ∞ | ∞ |
-| Listings with logos | ✗ | ✓ | ✓ | ✓ |
-| Remove badge, brand colours | ✗ | ✓ | ✓ | ✓ |
-| Basemap / georeference | ✗ | ✗ | ✓ | ✓ |
-| Search analytics | ✗ | basic | full | full + export |
-| JS SDK, API, Listing import | ✗ | ✗ | ✓ | ✓ |
-| Real-time multi-user editing | ✗ | ✗ | ✓ | ✓ |
-| Wayfinding, SSO, AI tracing beyond free allowance | ✗ | ✗ | add-on | ✓ |
+|                                                   | Free  | Starter (~£19) | Pro (~£79) | Enterprise    |
+| ------------------------------------------------- | ----- | -------------- | ---------- | ------------- |
+| Maps                                              | 1     | 1              | 5          | ∞             |
+| Buildings / Levels                                | 1 / 1 | 1 / 5          | ∞          | ∞             |
+| Spaces                                            | ~30   | 300            | ∞          | ∞             |
+| Listings with logos                               | ✗     | ✓              | ✓          | ✓             |
+| Remove badge, brand colours                       | ✗     | ✓              | ✓          | ✓             |
+| Basemap / georeference                            | ✗     | ✗              | ✓          | ✓             |
+| Search analytics                                  | ✗     | basic          | full       | full + export |
+| JS SDK, API, Listing import                       | ✗     | ✗              | ✓          | ✓             |
+| Real-time multi-user editing                      | ✗     | ✗              | ✓          | ✓             |
+| Wayfinding, SSO, AI tracing beyond free allowance | ✗     | ✗              | add-on     | ✓             |
 
 ## Stack
 
