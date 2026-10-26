@@ -35,9 +35,9 @@ export function splitOutline(
 	});
 
 	const groups = new Map<number, Polygon[]>();
-	pieces.forEach((piece, i) =>
-		groups.set(find(i), [...(groups.get(find(i)) ?? []), piece]),
-	);
+	for (const [i, piece] of pieces.entries()) {
+		groups.set(find(i), [...(groups.get(find(i)) ?? []), piece]);
+	}
 	if (groups.size < 2) return null;
 	return [...groups.values()].map((members) => {
 		const [first, ...rest] = members.map(toClip);
