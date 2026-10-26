@@ -22,12 +22,16 @@ Working record of product and stack decisions from design sessions. Use GLOSSARY
 
 - **Alpha** (design partners only, billing off, every Organisation gets everything): one Building, multiple Levels with Alignment, Underlay upload (image + PDF), scale-setting, ADR 0002 drawing tools, Space Kinds, Amenities, Listings + Categories (with logos), the Draft/Publish pipeline, one Embed (iframe, directory + search, level switcher, WCAG work started).
 - **Beta** (public, self-serve): onboarding flow, Stripe + Plans + limit checks, badge, several Embeds + Kiosk Mode + Allowed Domains, Listing-only publish, Search Event collection + basic dashboard, multiple Buildings + Outdoor Area + georeference/basemap, WCAG 2.2 AA complete.
-- **Phase 1.9 – AI tracing**: the AI traces an uploaded Underlay first, while the user sets the scale in parallel. Suggestions are tidied, shown as a ghost layer, and can be accepted or rejected individually or all at once. Only confident Suggestions are shown. Free: 1 trace per Level per month. A **feasibility test happens early** (10–20 real plans, comparing vision LLM, classic computer vision + OCR, and a hybrid), but the build waits.
+- **Phase 1.9 – AI tracing**: the AI traces an uploaded Underlay first, while the user sets the scale in parallel. Suggestions are tidied, shown as a ghost layer, and can be accepted or rejected individually or all at once. Only confident Suggestions are shown. Free: 1 trace per Level per month. A **feasibility test happens early** (10–20 real plans, comparing vision LLM, classic computer vision + OCR, and a hybrid), but the build waits. Magic fill already does single-room detection with classic image processing, so it is the baseline any AI approach has to beat.
 - **Phase 2+**: wayfinding, real-time multi-user editing (paid), JS SDK and API, suite apps (see suite-ideas.md).
 
 ## Alpha partners
 
 2–3 existing clients of different shapes (ideally a retail venue, an education venue and an office/event venue), offered free Pro for a year in exchange for regular feedback. Their real floor plans become the editor test material and the AI feasibility test set.
+
+## Drawing tools
+
+**Boxes** (drag rectangles; push walls, add corners, split, merge) and **Magic fill** (click inside a room on the Underlay) are the primary tools, with **Pen** (click corners) as the fallback. See the ADR 0002 amendment and the `prototype/drawing-tools` branch.
 
 ## Onboarding flow (target: first published map in under 15 minutes)
 
