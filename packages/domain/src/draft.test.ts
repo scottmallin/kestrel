@@ -125,3 +125,56 @@ describe("rejects", () => {
 		expect(result).toEqual({ ok: false, error: "No Space with id nope" });
 	});
 });
+
+describe("reshapeSpace", () => {
+	it("changes a Space's outline, and its inverse restores the old one", () => {
+		const original = draftWith(unit1);
+		const wider = rect(0, 0, 12, 8);
+
+		const reshaped = applyOk(original, {
+			type: "reshapeSpace",
+			id: "s1",
+			outline: wider,
+		});
+
+		expect(reshaped.draft.spaces.s1).toEqual({ ...unit1, outline: wider });
+		expect(applyOk(reshaped.draft, reshaped.inverse).draft).toEqual(original);
+	});
+});
+
+describe("updateSpace", () => {
+	it("changes Space Kind and Space Reference, and its inverse restores them", () => {
+		const corridor: Space = {
+			id: "c1",
+			levelId: "l1",
+			kind: "corridor",
+			outline: rect(0, 8, 20, 10),
+		};
+		const original = draftWith(corridor);
+
+		const updated = applyOk(original, {
+			type: "updateSpace",
+			id: "c1",
+			changes: { kind: "toilet", reference: "WC1" },
+		});
+
+		expect(updated.draft.spaces.c1).toEqual({
+			...corridor,
+			kind: "toilet",
+			reference: "WC1",
+		});
+		expect(applyOk(updated.draft, updated.inverse).draft).toEqual(original);
+	});
+
+	it("clears a Space Reference with null", () => {
+		const updated = applyOk(draftWith(unit1), {
+			type: "updateSpace",
+			id: "s1",
+			changes: { reference: null },
+		});
+		expect(updated.draft.spaces.s1).not.toHaveProperty("reference");
+		expect(applyOk(updated.draft, updated.inverse).draft).toEqual(
+			draftWith(unit1),
+		);
+	});
+});
