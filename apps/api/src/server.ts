@@ -1,6 +1,7 @@
 import { buildApp } from "./app.ts";
 import { createAuth } from "./auth.ts";
 import { createDb, createTestDb } from "./db/client.ts";
+import { diskStorage } from "./storage.ts";
 
 const port = Number(process.env.PORT ?? 3000);
 const baseURL = process.env.BASE_URL ?? `http://localhost:${port}`;
@@ -19,6 +20,10 @@ const auth = createAuth({
 		.split(",")
 		.filter(Boolean),
 });
-const app = buildApp({ db, auth }, { logger: true });
+// Uploaded files go to .data/files in development; an R2 adapter comes with deployment.
+const app = buildApp(
+	{ db, auth, storage: diskStorage(".data/files") },
+	{ logger: true },
+);
 
 await app.listen({ port, host: "0.0.0.0" });

@@ -1,6 +1,7 @@
 import { buildApp } from "../app.ts";
 import { createAuth } from "../auth.ts";
 import { createTestDb } from "../db/client.ts";
+import { memoryStorage } from "../storage.ts";
 
 /** A fresh app on an empty in-process Postgres, with helpers to act as signed-up users. */
 export async function testApp() {
@@ -10,7 +11,7 @@ export async function testApp() {
 		secret: "test-secret-at-least-32-characters-long",
 		baseURL: "http://localhost",
 	});
-	const app = buildApp({ db, auth });
+	const app = buildApp({ db, auth, storage: memoryStorage() });
 	let users = 0;
 
 	/** Signs up a new user who owns a new Organisation, returning a cookie for their requests. */
@@ -54,6 +55,13 @@ export async function testApp() {
 					url,
 					headers: { cookie },
 					...(payload && { payload }),
+				}),
+			upload: (url: string, body: Buffer, contentType: string) =>
+				app.inject({
+					method: "PUT",
+					url,
+					headers: { cookie, "content-type": contentType },
+					payload: body,
 				}),
 		};
 	}

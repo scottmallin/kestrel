@@ -5,9 +5,11 @@ import Fastify, {
 import type { Auth } from "./auth.ts";
 import type { Db } from "./db/client.ts";
 import { draftRoutes } from "./routes/draft.ts";
+import { levelRoutes } from "./routes/levels.ts";
 import { mapRoutes } from "./routes/maps.ts";
+import type { Storage } from "./storage.ts";
 
-export type AppDeps = { db: Db; auth: Auth };
+export type AppDeps = { db: Db; auth: Auth; storage: Storage };
 
 export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
 	const app = Fastify(options);
@@ -31,6 +33,7 @@ export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
 
 	app.register(mapRoutes(deps));
 	app.register(draftRoutes(deps));
+	app.register(levelRoutes(deps));
 	return app;
 }
 
