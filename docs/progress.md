@@ -1,17 +1,17 @@
 # Progress: pick up here
 
-Last updated: 2026-10-26. Read this first when resuming work, then [GLOSSARY.md](../GLOSSARY.md) for the domain language, [roadmap.md](roadmap.md) for product decisions and [adr/](adr/) for architecture decisions.
+Last updated: 2026-10-27. Read this first when resuming work, then [GLOSSARY.md](../GLOSSARY.md) for the domain language, [roadmap.md](roadmap.md) for product decisions and [adr/](adr/) for architecture decisions.
 
 ## Where we are
 
 We're building the **alpha editor** (see Phases in the roadmap). The plan for it is four steps:
 
-| Step | What                                                                                   | Status                                 |
-| ---- | -------------------------------------------------------------------------------------- | -------------------------------------- |
-| 1    | Operations and undo/redo in `packages/domain`                                          | ✅ Done (merged)                       |
-| 2    | Geometry in `packages/geometry`: snapping, split/merge/overlaps, Magic fill            | ✅ Done (merged)                       |
-| 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools | ✅ Done, on `feat/editor` (PR pending) |
-| 4    | Saving: API, database, Underlay upload                                                 | ⏭️ Next. Two open questions, see below |
+| Step | What                                                                                   | Status                               |
+| ---- | -------------------------------------------------------------------------------------- | ------------------------------------ |
+| 1    | Operations and undo/redo in `packages/domain`                                          | ✅ Done (merged)                     |
+| 2    | Geometry in `packages/geometry`: snapping, split/merge/overlaps, Magic fill            | ✅ Done (merged)                     |
+| 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools | ✅ Done (merged)                     |
+| 4    | Saving: API, database, Underlay upload                                                 | 🚧 In progress on `feat/persistence` |
 
 ## What's built
 
@@ -61,9 +61,9 @@ pnpm e2e         # Playwright browser tests (8), using the installed Microsoft E
 - **Pressing inside an existing Space with the Box tool moves it** rather than starting a new box. This is intended, but worth watching in user testing.
 - **Magic fill is slow on big plans**, because the wall grid is rebuilt when the darkness slider or closed openings change. That's fine at 2000px; watch it on large plans.
 
-## Next: step 4, saving
+## Now: step 4, saving
 
-Postgres tables for Organisations, Maps, Levels and the Draft; saving Operations as they happen; Underlay upload to Cloudflare R2. Two questions need Scott's decision first:
+Postgres tables for Organisations, Maps, Levels and the Draft; saving Operations as they happen; Underlay upload to Cloudflare R2. Decided on 2026-10-27:
 
-1. **Store each Operation, or save the whole Draft?** The recommendation is to store each Operation as it happens, plus a periodic snapshot of the Draft. That gives version history and the base for real-time multi-user editing, and loading stays fast.
-2. **Sign-in now or later?** The recommendation is to add Better Auth with Organisations now, since every table needs an Organisation id from day one.
+1. **The Draft is saved as a log of Operations with periodic snapshots**, and a stale save is rejected as a conflict. See [ADR 0005](adr/0005-draft-saved-as-operation-log-with-snapshots.md).
+2. **Sign-in comes now**: Better Auth with Organisations and roles, so every table carries an Organisation id from the start.
