@@ -19,4 +19,24 @@ describe("Maps", () => {
 		const list = await scott.request("GET", "/api/maps");
 		expect(list.json()).toEqual([{ id: map.id, name: "Main mall" }]);
 	});
+
+	it("keeps each Organisation's Maps to itself", async () => {
+		const { signUp } = await testApp();
+		const trafford = await signUp("Trafford");
+		const oxford = await signUp("Oxford");
+		const map = (
+			await trafford.request("POST", "/api/maps", { name: "Main mall" })
+		).json();
+
+		expect((await oxford.request("GET", "/api/maps")).json()).toEqual([]);
+		expect(
+			(await oxford.request("GET", `/api/maps/${map.id}/draft`)).statusCode,
+		).toBe(404);
+	});
+
+	it("refuses requests from people who aren't signed in", async () => {
+		const { app } = await testApp();
+		const response = await app.inject({ method: "GET", url: "/api/maps" });
+		expect(response.statusCode).toBe(401);
+	});
 });

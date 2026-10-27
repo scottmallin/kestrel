@@ -4,6 +4,7 @@ import Fastify, {
 } from "fastify";
 import type { Auth } from "./auth.ts";
 import type { Db } from "./db/client.ts";
+import { draftRoutes } from "./routes/draft.ts";
 import { mapRoutes } from "./routes/maps.ts";
 
 export type AppDeps = { db: Db; auth: Auth };
@@ -29,6 +30,7 @@ export function buildApp(deps: AppDeps, options: FastifyServerOptions = {}) {
 	});
 
 	app.register(mapRoutes(deps));
+	app.register(draftRoutes(deps));
 	return app;
 }
 
