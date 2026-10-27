@@ -33,4 +33,4 @@ pnpm build
 pnpm check       # Biome lint + format check (pnpm format to fix)
 ```
 
-The API reads `apps/api/.env` (copy `.env.example`).
+The API reads `apps/api/.env` (copy `.env.example`). Without `DATABASE_URL` it stores data with PGlite in `apps/api/.data/`, so no Postgres is needed for development. Run the API and the editor (`pnpm --filter @kestrel/api dev`, `pnpm --filter @kestrel/editor dev`), then open http://localhost:5173.
