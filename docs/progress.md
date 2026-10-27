@@ -13,7 +13,7 @@ We're building the **alpha editor** (see Phases in the roadmap). The plan for it
 | 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools | ✅ Done (merged)                           |
 | 4    | Saving: sign-in, API, database, Underlay upload                                        | ✅ Done on `feat/persistence` (PR pending) |
 
-What comes next is open: see [Next](#next) below.
+Now: **publishing and the first Embed**, on `feat/publishing` (ADR 0003 amendment).
 
 ## What's built
 
