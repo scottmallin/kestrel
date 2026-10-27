@@ -1,5 +1,6 @@
 import type { Operation, Space } from "@kestrel/domain";
 import { describe, expect, it } from "vitest";
+import { draftSnapshots } from "./db/schema.ts";
 import { testApp } from "./test/harness.ts";
 
 const box = (id: string, x: number): Space => ({
@@ -103,5 +104,35 @@ describe("Draft", () => {
 			);
 		}
 		expect(await load()).toEqual({ seq: 0, draft: { spaces: {} } });
+	});
+
+	it("keeps loading the right Draft once snapshots are taken", async () => {
+		const { save, load, db } = await newMap();
+		// 130 edits in batches of 10: add a Space, then keep widening it.
+		let seq = 0;
+		let width = 10;
+		for (let batch = 0; batch < 13; batch++) {
+			const operations: Operation[] = [];
+			for (let i = 0; i < 10; i++) {
+				if (seq === 0 && i === 0)
+					operations.push({ type: "addSpace", space: box("a", 0) });
+				else {
+					width++;
+					operations.push({
+						type: "reshapeSpace",
+						id: "a",
+						outline: box("a", 0).outline.map((p) =>
+							p.x > 0 ? { ...p, x: width } : p,
+						),
+					});
+				}
+			}
+			seq = (await save(seq, operations)).json().seq;
+		}
+
+		expect(await db.select().from(draftSnapshots)).not.toHaveLength(0);
+		const loaded = await load();
+		expect(loaded.seq).toBe(130);
+		expect(loaded.draft.spaces.a.outline).toContainEqual({ x: 139, y: 8 });
 	});
 });

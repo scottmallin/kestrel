@@ -38,6 +38,9 @@ export async function loadDraft(
 	return { seq, draft };
 }
 
+/** A snapshot is stored each time the log passes a multiple of this many Operations. */
+const SNAPSHOT_EVERY = 50;
+
 export type AppendResult =
 	| { readonly ok: true; readonly seq: number }
 	/** Someone saved since baseSeq; the client must reload from `seq`. */
@@ -81,7 +84,13 @@ export async function appendOperations(
 					})),
 				);
 			}
-			return { ok: true, seq: baseSeq + operations.length } as const;
+			const seq = baseSeq + operations.length;
+			if (
+				Math.floor(seq / SNAPSHOT_EVERY) > Math.floor(baseSeq / SNAPSHOT_EVERY)
+			) {
+				await tx.insert(draftSnapshots).values({ mapId, seq, draft });
+			}
+			return { ok: true, seq } as const;
 		});
 	} catch (error) {
 		// Two saves raced past the check above; the loser hits the (map, seq) primary key.
