@@ -3,10 +3,23 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Kestrel Map</title>
+		<title>Map</title>
+		<!-- Shown inside other sites' iframes: no icon needed, so don't request one. -->
+		<link rel="icon" href="data:," />
 	</head>
 	<body>
-		<div id="map"></div>
+		<main class="embed">
+			<div id="map" class="map" role="img" aria-label="Map"></div>
+			<section class="directory" aria-labelledby="directory-heading">
+				<h1 id="directory-heading" class="map-name">Loading map…</h1>
+				<label class="search">
+					<span>Find a place</span>
+					<input id="search" type="search" autocomplete="off" disabled />
+				</label>
+				<p id="results-count" class="count" role="status" aria-live="polite"></p>
+				<ul id="results" class="results"></ul>
+			</section>
+		</main>
 		<script type="module" src="/src/main.ts"></script>
 	</body>
 </html>

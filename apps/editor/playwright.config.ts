@@ -2,6 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 const API_PORT = 3101;
 const EDITOR_PORT = 5175;
+const EMBED_PORT = 5176;
 
 export default defineConfig({
 	testDir: "e2e",
@@ -28,6 +29,16 @@ export default defineConfig({
 		{
 			command: `pnpm exec vite --port ${EDITOR_PORT} --strictPort`,
 			url: `http://localhost:${EDITOR_PORT}`,
+			env: {
+				API_URL: `http://localhost:${API_PORT}`,
+				VITE_EMBED_URL: `http://localhost:${EMBED_PORT}`,
+			},
+			reuseExistingServer: true,
+		},
+		{
+			// The production build, so bundling problems (like MapLibre's worker) show up here.
+			command: `pnpm --filter @kestrel/embed exec vite build && pnpm --filter @kestrel/embed exec vite preview --port ${EMBED_PORT} --strictPort`,
+			url: `http://localhost:${EMBED_PORT}`,
 			env: { API_URL: `http://localhost:${API_PORT}` },
 			reuseExistingServer: true,
 		},

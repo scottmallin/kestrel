@@ -2,3 +2,4 @@
 export const BUNDLE_FORMAT_VERSION = 1;
 
 export * from "./compile.ts";
+export * from "./style.ts";

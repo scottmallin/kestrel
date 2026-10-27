@@ -16,6 +16,7 @@ import { useStore } from "zustand";
 import { api, type LevelDetails, type MapDetails } from "../api.ts";
 import { deleteSelection, mergeSelection } from "./actions.ts";
 import { LevelCanvas } from "./LevelCanvas.tsx";
+import { PublishPanel } from "./PublishPanel.tsx";
 import { createEditorStore, type EditorStore } from "./store.ts";
 import { createDraftSync, type SyncStatus } from "./sync.ts";
 import type { ToolContext, ToolName } from "./tool.ts";
@@ -64,7 +65,35 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	const { history, selection, error } = useStore(store);
 	const [toolName, setToolName] = useState<ToolName>("box");
 	const [underlay, setUnderlay] = useState<Underlay | null>(null);
-	const [uploading, setUploading] = useState<string | null>(null);
+	const [notice, setNotice] = useState<string | null>(null);
+	const [published, setPublished] = useState(
+		map.published && { version: map.published.version },
+	);
+	const [publishing, setPublishing] = useState(false);
+	const [shownEmbed, setShownEmbed] = useState<{
+		version: number;
+		embedId: string;
+	} | null>(null);
+
+	/** Publishes once every edit has reached the server, so what's published is what you see. */
+	const publish = async () => {
+		setPublishing(true);
+		setNotice(null);
+		try {
+			await sync.idle();
+			if (sync.status() !== "saved")
+				throw new Error("some edits haven't been saved yet");
+			const result = await api.publish(map.id);
+			setPublished({ version: result.version });
+			setShownEmbed(result);
+		} catch (e) {
+			setNotice(
+				`Couldn't publish: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		} finally {
+			setPublishing(false);
+		}
+	};
 
 	useEffect(() => {
 		if (level.underlay)
@@ -84,15 +113,15 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 
 	/** Uploads a floor plan for this Level (converted to PNG first) and shows it. */
 	const applyFloorPlan = async (file: Blob) => {
-		setUploading("Uploading floor plan…");
+		setNotice("Uploading floor plan…");
 		try {
 			await api.uploadUnderlay(level.id, await toUploadablePng(file));
 			setUnderlay(
 				await loadUnderlay(`${api.underlayUrl(level.id)}?v=${Date.now()}`),
 			);
-			setUploading(null);
+			setNotice(null);
 		} catch (e) {
-			setUploading(
+			setNotice(
 				`Couldn't use that floor plan: ${e instanceof Error ? e.message : String(e)}`,
 			);
 		}
@@ -188,7 +217,7 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		return () => window.removeEventListener("keydown", onKey);
 	}, [store]);
 
-	const message = error ?? uploading ?? tool.status;
+	const message = error ?? notice ?? tool.status;
 
 	return (
 		<div style={layout}>
@@ -198,6 +227,19 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 				</button>
 				<strong>{map.name}</strong>
 				<SaveIndicator status={saveStatus} />
+				<button
+					type="button"
+					onClick={() => void publish()}
+					disabled={publishing}
+					style={publishButton}
+				>
+					{publishing ? "Publishing…" : "Publish"}
+				</button>
+				{published && (
+					<span style={{ color: "#64748b" }}>
+						Live: version {published.version}
+					</span>
+				)}
 				<div style={group} role="toolbar" aria-label="Drawing tools">
 					{TOOLS.map((t) => (
 						<button
@@ -319,6 +361,14 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 					underlay={underlay}
 					underlayOpacity={opacity}
 				/>
+				{shownEmbed && (
+					<PublishPanel
+						version={shownEmbed.version}
+						embedId={shownEmbed.embedId}
+						mapName={map.name}
+						onClose={() => setShownEmbed(null)}
+					/>
+				)}
 			</div>
 			<SidePanel
 				store={store}
@@ -518,4 +568,14 @@ const alertBar: CSSProperties = {
 	background: "#fee2e2",
 	borderBottom: "1px solid #fecaca",
 	color: "#7f1d1d",
+};
+
+const publishButton: CSSProperties = {
+	padding: "6px 14px",
+	borderRadius: 6,
+	border: "none",
+	background: "#16a34a",
+	color: "#fff",
+	fontWeight: 600,
+	cursor: "pointer",
 };
