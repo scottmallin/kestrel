@@ -324,6 +324,9 @@ importers:
       "@kestrel/domain":
         specifier: workspace:*
         version: link:../domain
+      "@kestrel/geometry":
+        specifier: workspace:*
+        version: link:../geometry
 
   packages/ui: {}
 
