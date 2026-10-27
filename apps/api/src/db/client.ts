@@ -1,3 +1,4 @@
+import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
@@ -21,8 +22,10 @@ export async function createDb(url: string): Promise<Db> {
 	return db;
 }
 
-/** A fresh, migrated, in-process Postgres. Optionally kept in a folder so it survives restarts. */
-export async function createTestDb(dataDir?: string): Promise<Db> {
+/** A migrated, in-process Postgres: fresh in memory for tests, or kept in a folder for development. */
+export async function createPgliteDb(dataDir?: string): Promise<Db> {
+	// PGlite won't create missing parent folders itself.
+	if (dataDir) mkdirSync(dataDir, { recursive: true });
 	const db = drizzlePglite(new PGlite(dataDir), { schema });
 	await migratePglite(db, { migrationsFolder });
 	return db;

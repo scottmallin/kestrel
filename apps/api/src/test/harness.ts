@@ -1,11 +1,11 @@
 import { buildApp } from "../app.ts";
 import { createAuth } from "../auth.ts";
-import { createTestDb } from "../db/client.ts";
+import { createPgliteDb } from "../db/client.ts";
 import { memoryStorage } from "../storage.ts";
 
 /** A fresh app on an empty in-process Postgres, with helpers to act as signed-up users. */
 export async function testApp() {
-	const db = await createTestDb();
+	const db = await createPgliteDb();
 	const auth = createAuth({
 		db,
 		secret: "test-secret-at-least-32-characters-long",
