@@ -66,3 +66,34 @@ export const draftSnapshots = pgTable(
 	},
 	(t) => [primaryKey({ columns: [t.mapId, t.seq] })],
 );
+
+/** An unchangeable snapshot of a Map's Draft, compiled into a bundle for Embeds (ADR 0003). */
+export const publishedVersions = pgTable(
+	"published_version",
+	{
+		mapId: uuid("map_id")
+			.notNull()
+			.references(() => maps.id, { onDelete: "cascade" }),
+		/** 1 for the first publish, rising by one each time. */
+		version: integer("version").notNull(),
+		/** The Draft's sequence number when it was published. */
+		seq: integer("seq").notNull(),
+		/** Storage key of the compiled bundle. */
+		bundleKey: text("bundle_key").notNull(),
+		publishedBy: text("published_by").references(() => user.id, {
+			onDelete: "set null",
+		}),
+		publishedAt: timestamp("published_at").notNull().defaultNow(),
+	},
+	(t) => [primaryKey({ columns: [t.mapId, t.version] })],
+);
+
+/** A configured way of showing a Map on a website; its id is what embed codes point at. */
+export const embeds = pgTable("embed", {
+	id: uuid("id").primaryKey().defaultRandom(),
+	mapId: uuid("map_id")
+		.notNull()
+		.references(() => maps.id, { onDelete: "cascade" }),
+	name: text("name").notNull(),
+	createdAt: timestamp("created_at").notNull().defaultNow(),
+});

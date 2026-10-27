@@ -4,6 +4,9 @@ import { levels, maps, member } from "../db/schema.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Ids are UUIDs; checking first avoids a database error for anything else. */
+export const isUuid = (value: string) => UUID.test(value);
+
 /** The Map, if it exists and the user belongs to its Organisation; otherwise null (reply 404 either way). */
 export async function findMapForUser(db: Db, mapId: string, userId: string) {
 	if (!UUID.test(mapId)) return null;
