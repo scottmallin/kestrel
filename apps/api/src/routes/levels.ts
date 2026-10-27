@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AppDeps } from "../app.ts";
-import { levels } from "../db/schema.ts";
+import { embeds, levels, publishedVersions } from "../db/schema.ts";
 import { DEFAULT_PIXELS_PER_METRE } from "../underlay.ts";
 import { findLevelForUser, findMapForUser } from "./access.ts";
 import { requireUser } from "./session.ts";
@@ -27,11 +27,27 @@ export const levelRoutes =
 				if (!user) return;
 				const map = await findMapForUser(db, request.params.mapId, user.userId);
 				if (!map) return reply.status(404).send({ error: "No such Map." });
-				const rows = await db
-					.select()
-					.from(levels)
-					.where(eq(levels.mapId, map.id))
-					.orderBy(asc(levels.ordinal));
+				const [rows, embedRows, [latest]] = await Promise.all([
+					db
+						.select()
+						.from(levels)
+						.where(eq(levels.mapId, map.id))
+						.orderBy(asc(levels.ordinal)),
+					db
+						.select({ id: embeds.id, name: embeds.name })
+						.from(embeds)
+						.where(eq(embeds.mapId, map.id))
+						.orderBy(asc(embeds.createdAt)),
+					db
+						.select({
+							version: publishedVersions.version,
+							publishedAt: publishedVersions.publishedAt,
+						})
+						.from(publishedVersions)
+						.where(eq(publishedVersions.mapId, map.id))
+						.orderBy(desc(publishedVersions.version))
+						.limit(1),
+				]);
 				return {
 					id: map.id,
 					name: map.name,
@@ -46,6 +62,13 @@ export const levelRoutes =
 								}
 							: null,
 					})),
+					published: latest
+						? {
+								version: latest.version,
+								publishedAt: latest.publishedAt.toISOString(),
+							}
+						: null,
+					embeds: embedRows,
 				};
 			},
 		);

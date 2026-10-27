@@ -4,16 +4,17 @@ Last updated: 2026-10-27. Read this first when resuming work, then [GLOSSARY.md]
 
 ## Where we are
 
-We're building the **alpha editor** (see Phases in the roadmap). The plan for it was four steps:
+We're building the **alpha** (see Phases in the roadmap). Steps so far:
 
-| Step | What                                                                                   | Status                                     |
-| ---- | -------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 1    | Operations and undo/redo in `packages/domain`                                          | ✅ Done (merged)                           |
-| 2    | Geometry in `packages/geometry`: snapping, split/merge/overlaps, Magic fill            | ✅ Done (merged)                           |
-| 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools | ✅ Done (merged)                           |
-| 4    | Saving: sign-in, API, database, Underlay upload                                        | ✅ Done on `feat/persistence` (PR pending) |
+| Step | What                                                                                   | Status                                    |
+| ---- | -------------------------------------------------------------------------------------- | ----------------------------------------- |
+| 1    | Operations and undo/redo in `packages/domain`                                          | ✅ Done (merged)                          |
+| 2    | Geometry in `packages/geometry`: snapping, split/merge/overlaps, Magic fill            | ✅ Done (merged)                          |
+| 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools | ✅ Done (merged)                          |
+| 4    | Saving: sign-in, API, database, Underlay upload                                        | ✅ Done (merged)                          |
+| 5    | Publishing and the first Embed (ADR 0003 amendment)                                    | ✅ Done on `feat/publishing` (PR pending) |
 
-What comes next is open: see [Next](#next) below.
+The whole journey now works: draw, publish, paste one line, a live map. What comes next is open: see [Next](#next).
 
 ## What's built
 
@@ -29,7 +30,8 @@ What comes next is open: see [Next](#next) below.
 - `GET/POST /api/maps`, `GET /api/maps/:id` (with Levels and their Underlays). A new Map gets a "Ground floor" Level.
 - `GET /api/maps/:id/draft` and `POST /api/maps/:id/operations`. The Draft is a log of Operations with a snapshot every 50 (ADR 0005). Saves are rejected with 409 if out of date, 422 if an Operation doesn't apply, and 400 if malformed.
 - `PUT/GET /api/levels/:id/underlay`: PNG, JPEG or WebP only, served with `nosniff` and a sandboxing CSP. Files go through the `Storage` interface: memory in tests, `.data/files` in development.
-- Every route checks that the user belongs to the Map's Organisation (404 otherwise).
+- `POST /api/maps/:id/publish` compiles the saved Draft into a new Published Version (stored through `Storage`) and creates the Map's first Embed if needed. `GET /api/public/embeds/:id` serves the latest bundle to anyone, cross-origin, cached for 60s.
+- Every route checks that the user belongs to the Map's Organisation (404 otherwise), except the public Embed route.
 - Database: real Postgres when `DATABASE_URL` is set; otherwise PGlite stored in `.data/pglite`; or entirely in memory with `KESTREL_EPHEMERAL=1` (browser tests). Migrations are in `drizzle/` and run on start.
 
 **`apps/editor`**: React + react-konva.
@@ -39,10 +41,15 @@ What comes next is open: see [Next](#next) below.
 - `src/editor/store.ts`: Zustand store over `History`, plus the selection and the last rejected Operation's error. It reports every applied Operation (including undo and redo) to the save queue.
 - `src/editor/tools/`: one hook per tool, `useBoxTool`, `useFillTool`, `useSplitTool` and `usePenTool`, all built on the `Tool` interface in `tool.ts`. Tools do their own hit-testing with geometry; Konva only draws.
 - `LevelCanvas.tsx`: zoom, pan, and mouse handling through native events, since they carry the real click count.
+- `PublishPanel.tsx`: after Publish (which waits for unsaved edits), the embed code with Copy and a link to the Embed. `VITE_EMBED_URL` says where the Embed is served (default `http://localhost:5174`).
 - `Editor.tsx`: toolbar, shortcuts (B/F/S/P, M, Delete, Ctrl+Z / Ctrl+Shift+Z), save status, a conflict banner with Reload, and the side panel for Space Reference and Space Kind. Floor plans are converted to PNG in the browser (`toUploadablePng`) before upload.
 - The dev server proxies `/api` to the API (`API_URL`, default `http://localhost:3000`), so cookies stay on the editor's origin.
 
-**`apps/embed`, `apps/web`, `packages/publish`, `packages/ui`**: scaffolds only.
+**`packages/publish`**: `compileBundle` turns a Draft into a Published Version bundle: GeoJSON Spaces at 0°, 0° (north up, anticlockwise rings), the directory (referenced Spaces in natural order), bounds. Output doesn't depend on drawing order. Also the shared Space Kind colours and labels.
+
+**`apps/embed`**: plain TypeScript + MapLibre, opened as `/?embed=<id>` in an iframe. Spaces coloured by Space Kind with HTML labels (no font server), a searchable directory with a live result count (the accessible route; the canvas is hidden from screen readers and the tab order), selection that centres the Space. Mobile-first. MapLibre's worker is bundled explicitly via `?worker&url`, since MapLibre picks its file at runtime. `VITE_API_URL` says where the API is (same origin via the dev proxy by default).
+
+**`apps/web`, `packages/ui`**: scaffolds only.
 
 **`prototype/drawing-tools` branch**: the throwaway prototype comparing Pen, Boxes and Magic fill. Never merge it. The verdict is in the ADR 0002 amendment.
 
@@ -53,10 +60,11 @@ pnpm install
 cp apps/api/.env.example apps/api/.env   # first time only
 pnpm --filter @kestrel/api dev           # API at http://localhost:3000 (PGlite in apps/api/.data)
 pnpm --filter @kestrel/editor dev        # editor at http://localhost:5173 → create an account
+pnpm --filter @kestrel/embed dev         # Embed at http://localhost:5174 (open it from Publish)
 pnpm check       # Biome lint + format (run `pnpm format` twice if imports were reordered)
 pnpm typecheck
-pnpm test        # Vitest unit tests (72)
-pnpm e2e         # Playwright browser tests (11) in the installed Microsoft Edge; starts its own API and editor
+pnpm test        # Vitest unit tests (82)
+pnpm e2e         # Playwright browser tests (14) in the installed Microsoft Edge; starts its own API, editor and a production build of the Embed
 ```
 
 ## How we work
@@ -66,7 +74,7 @@ pnpm e2e         # Playwright browser tests (11) in the installed Microsoft Edge
   - domain and geometry: unit tests through their public functions;
   - API: real HTTP requests (`app.inject`) against a fresh PGlite database;
   - editor: store and save-queue unit tests, plus browser tests per tool and for saving.
-- **Run the real thing**, not just the tests, before calling a step done. It caught the missing PGlite folder in step 4.
+- **Run the real thing**, not just the tests, before calling a step done, and look at screenshots. It caught the missing PGlite folder in step 4, and the over-zooming Embed and the missing MapLibre worker in step 5. Browser tests fail on any console error in the Embed and run its production build.
 - **Prototypes** live on throwaway branches. Only the decision moves to `main`, recorded in an ADR or the roadmap.
 - **Terms** come from GLOSSARY.md (Space, Level, Underlay, Draft, Operation…), never their "avoid" synonyms.
 
@@ -83,6 +91,10 @@ pnpm e2e         # Playwright browser tests (11) in the installed Microsoft Edge
 - **Labels can collide**: Space labels sit at the centre of the bounding box, so they can overlap the plan's own text and fall outside L-shaped Spaces.
 - **Pressing inside an existing Space with the Box tool moves it** rather than starting a new box. This is intended, but worth watching in user testing.
 - **Magic fill is slow on big plans**, because the wall grid is rebuilt when the darkness slider or closed openings change.
+- **The Embed is basic**: one Level (no Level switcher yet), no Allowed Domains or Kiosk Mode, and its labels don't avoid each other, so small Spaces' labels can overlap.
+- **The Embed is heavy**: about 1.1 MB of JavaScript plus a 0.5 MB worker, almost all MapLibre. Fine for alpha; worth trimming before launch.
+- **Two simultaneous publishes of one Map** would collide on the version number and one would fail with a server error. Rare; make it a clean retry when it matters.
+- **No version history in the UI**: every Published Version is kept, but there's no way to see or roll back to them yet.
 
 ## Next
 
@@ -90,7 +102,6 @@ The alpha scope in the roadmap still needs, roughly in order:
 
 1. **Levels**: add, rename and reorder Levels, switch between them, and Alignment (pin each Level's Underlay to the one below).
 2. **Scale-setting** in onboarding (draw a line, enter its length), replacing the 20 px/m assumption.
-3. **Listings + Categories**, placed by clicking Spaces, and Amenities (Lucide icons, including fire-safety ones).
-4. **Publishing**: compile the Draft into a Published Version bundle (`packages/publish`), and the first Embed (MapLibre viewer, directory + search, Level switcher).
-5. **Deployment** for alpha partners: hosting, Neon, the R2 adapter, and email for account recovery.
-6. **PDF Underlays**.
+3. **Listings + Categories**, placed by clicking Spaces, and Amenities (Lucide icons, including fire-safety ones). The directory switches from Space References to Listings.
+4. **Deployment** for alpha partners: hosting, Neon, the R2 adapter, the Embed on a CDN, and email for account recovery.
+5. **PDF Underlays**.

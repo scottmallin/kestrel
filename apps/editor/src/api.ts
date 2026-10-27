@@ -8,7 +8,14 @@ export type LevelDetails = {
 	ordinal: number;
 	underlay: { pixelsPerMetre: number } | null;
 };
-export type MapDetails = { id: string; name: string; levels: LevelDetails[] };
+export type MapDetails = {
+	id: string;
+	name: string;
+	levels: LevelDetails[];
+	/** The latest Published Version, if the Map has been published. */
+	published: { version: number; publishedAt: string } | null;
+	embeds: { id: string; name: string }[];
+};
 export type SignedInUser = { id: string; name: string; email: string };
 
 /** A request failed; `message` is safe to show to the user. */
@@ -112,6 +119,11 @@ export const api = {
 			return { ok: false, reason: "rejected", error: error.message };
 		}
 	},
+
+	publish: (mapId: string) =>
+		call<{ version: number; embedId: string }>(`/api/maps/${mapId}/publish`, {
+			method: "POST",
+		}),
 
 	uploadUnderlay: (levelId: string, png: Blob) =>
 		call<null>(`/api/levels/${levelId}/underlay`, {

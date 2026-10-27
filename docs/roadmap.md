@@ -76,11 +76,11 @@ Working record of product and stack decisions from design sessions. Use GLOSSARY
 - **Repo**: pnpm + Turborepo monorepo: `apps/{api, editor, embed, web}`, `packages/{domain, geometry, publish, ui}`. A `platform` package splits out when the second suite app arrives.
 
 - **Editor**: React + react-konva + Vite single-page app, Zustand (TanStack Router/Query to come with the API). Every edit goes through Operations (ADR 0004). Unit tests with Vitest; browser tests with Playwright against the installed Edge.
-- **Embed**: separate small Vite bundle (MapLibre GL + vanilla TS or Preact), delivered as an iframe with deep-link URL parameters.
+- **Embed**: separate Vite bundle (plain TypeScript + MapLibre GL), delivered as an iframe (`/?embed=<id>`). It reads the latest Published Version from a public API route for now, moving behind a CDN at deployment (ADR 0003).
 - **Marketing site**: Astro.
 - **API**: Fastify + Drizzle on Postgres (Neon). No PostGIS yet.
 - **Auth**: Better Auth (organisations, roles, SSO later).
 - **Billing**: Stripe Billing + Stripe Tax, kept behind the platform layer.
-- **Storage/CDN**: Cloudflare R2 for Underlays and Published Version bundles.
+- **Storage/CDN**: Cloudflare R2 for Underlays and Published Version bundles, behind the API's `Storage` interface (local disk in development; the R2 adapter comes with deployment).
 - **Jobs**: pg-boss (PDF rendering, publishing, later AI tracing).
 - **Hosting**: Fly.io or Railway, in a UK/EU region.

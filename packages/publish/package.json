@@ -11,6 +11,7 @@
 		"test": "vitest run --passWithNoTests"
 	},
 	"dependencies": {
-		"@kestrel/domain": "workspace:*"
+		"@kestrel/domain": "workspace:*",
+		"@kestrel/geometry": "workspace:*"
 	}
 }
