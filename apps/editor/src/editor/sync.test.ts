@@ -79,7 +79,13 @@ describe("draft sync", () => {
 
 	it("goes offline when a save can't reach the server, then retries without losing or repeating anything", async () => {
 		const api = fakeApi();
-		const sync = createDraftSync({ save: api.save, seq: 0, retryDelayMs: 5 });
+		const seen: string[] = [];
+		const sync = createDraftSync({
+			save: api.save,
+			seq: 0,
+			retryDelayMs: 5,
+			onStatus: (s) => seen.push(s),
+		});
 		api.answerNext(() => ({ ok: false, reason: "network" }));
 		const release = api.holdNext();
 
@@ -90,6 +96,7 @@ describe("draft sync", () => {
 		release();
 		await sync.idle();
 
+		expect(seen).toEqual(["saving", "offline", "saved"]);
 		expect(sync.status()).toBe("saved");
 		expect(api.saves).toEqual([
 			{ baseSeq: 0, ids: ["a"] },

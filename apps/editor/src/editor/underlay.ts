@@ -12,20 +12,53 @@ export const DEFAULT_PIXELS_PER_METRE = 20;
 /** Larger images are scaled down so filling and snapping stay fast. */
 const MAX_PIXELS = 2000;
 
-export async function loadUnderlay(src: string): Promise<Underlay> {
+async function decode(src: string): Promise<HTMLImageElement> {
 	const image = new Image();
 	image.src = src;
 	await image.decode();
-	const ratio = Math.min(
-		1,
-		MAX_PIXELS / Math.max(image.naturalWidth, image.naturalHeight),
-	);
-	if (ratio === 1) return { image, pixelsPerMetre: DEFAULT_PIXELS_PER_METRE };
-	const canvas = document.createElement("canvas");
-	canvas.width = Math.round(image.naturalWidth * ratio);
-	canvas.height = Math.round(image.naturalHeight * ratio);
-	canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
-	return loadUnderlay(canvas.toDataURL());
+	return image;
+}
+
+/** Loads a saved Underlay (already at most MAX_PIXELS, as converted for upload). */
+export async function loadUnderlay(
+	src: string,
+	pixelsPerMetre = DEFAULT_PIXELS_PER_METRE,
+): Promise<Underlay> {
+	return { image: await decode(src), pixelsPerMetre };
+}
+
+/**
+ * Converts any image the browser can read (PNG, JPEG, SVG…) into a PNG of at most MAX_PIXELS on a white
+ * background, ready to upload. The server only stores raster images, so an SVG never reaches it.
+ */
+export async function toUploadablePng(file: Blob): Promise<Blob> {
+	const url = URL.createObjectURL(file);
+	try {
+		const image = await decode(url);
+		const ratio = Math.min(
+			1,
+			MAX_PIXELS / Math.max(image.naturalWidth, image.naturalHeight),
+		);
+		const canvas = document.createElement("canvas");
+		canvas.width = Math.round(image.naturalWidth * ratio);
+		canvas.height = Math.round(image.naturalHeight * ratio);
+		const g = canvas.getContext("2d");
+		if (!g) throw new Error("Canvas is not available");
+		g.fillStyle = "#fff";
+		g.fillRect(0, 0, canvas.width, canvas.height);
+		g.drawImage(image, 0, 0, canvas.width, canvas.height);
+		return await new Promise<Blob>((resolve, reject) =>
+			canvas.toBlob(
+				(blob) =>
+					blob
+						? resolve(blob)
+						: reject(new Error("Couldn't convert the image")),
+				"image/png",
+			),
+		);
+	} finally {
+		URL.revokeObjectURL(url);
+	}
 }
 
 /** A line drawn across an opening (e.g. a shopfront) so Magic fill treats it as a wall. Metres. */

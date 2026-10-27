@@ -23,6 +23,8 @@ export type DraftSyncOptions = {
 	seq: number;
 	/** First wait before retrying after a network failure; doubles each time, up to 30s. */
 	retryDelayMs?: number;
+	/** Called whenever the status changes. */
+	onStatus?: (status: SyncStatus) => void;
 };
 
 const MAX_RETRY_DELAY_MS = 30_000;
@@ -32,10 +34,16 @@ export function createDraftSync({
 	save,
 	seq: loadedSeq,
 	retryDelayMs = 1000,
+	onStatus,
 }: DraftSyncOptions) {
 	let seq = loadedSeq;
 	let queue: Operation[] = [];
 	let status: SyncStatus = "saved";
+	const setStatus = (next: SyncStatus) => {
+		if (next === status) return;
+		status = next;
+		onStatus?.(next);
+	};
 	let error: string | null = null;
 	let running: Promise<void> | null = null;
 	/** After a conflict or rejection nothing more is sent; the editor must reload. */
@@ -48,7 +56,7 @@ export function createDraftSync({
 			const result = await save(seq, batch);
 			if (!result.ok && result.reason === "network") {
 				// Keep the batch queued and try again; edits made meanwhile join the next attempt.
-				status = "offline";
+				setStatus("offline");
 				await new Promise((resolve) =>
 					setTimeout(
 						resolve,
@@ -58,25 +66,26 @@ export function createDraftSync({
 				continue;
 			}
 			if (!result.ok) {
-				status = result.reason;
+				// Set the reason first, so status listeners can read it.
 				error =
 					result.reason === "rejected"
 						? result.error
 						: "This Map was changed elsewhere. Reload to continue.";
+				setStatus(result.reason);
 				return;
 			}
 			failures = 0;
 			seq = result.seq;
 			queue = queue.slice(batch.length);
 		}
-		status = "saved";
+		setStatus("saved");
 	}
 
 	return {
 		push(operation: Operation) {
 			queue = [...queue, operation];
 			if (stopped()) return;
-			if (status === "saved") status = "saving";
+			if (status === "saved") setStatus("saving");
 			running ??= run().finally(() => {
 				running = null;
 			});

@@ -1,4 +1,9 @@
-import { SPACE_KINDS, type Space, type SpaceKind } from "@kestrel/domain";
+import {
+	type Draft,
+	SPACE_KINDS,
+	type Space,
+	type SpaceKind,
+} from "@kestrel/domain";
 import { findOverlaps, polygonArea } from "@kestrel/geometry";
 import {
 	type CSSProperties,
@@ -8,15 +13,17 @@ import {
 	useState,
 } from "react";
 import { useStore } from "zustand";
+import { api, type LevelDetails, type MapDetails } from "../api.ts";
 import { deleteSelection, mergeSelection } from "./actions.ts";
 import { LevelCanvas } from "./LevelCanvas.tsx";
 import { createEditorStore, type EditorStore } from "./store.ts";
+import { createDraftSync, type SyncStatus } from "./sync.ts";
 import type { ToolContext, ToolName } from "./tool.ts";
 import { useBoxTool } from "./tools/useBoxTool.tsx";
 import { useFillTool } from "./tools/useFillTool.tsx";
 import { usePenTool } from "./tools/usePenTool.tsx";
 import { useSplitTool } from "./tools/useSplitTool.tsx";
-import { loadUnderlay, type Underlay } from "./underlay.ts";
+import { loadUnderlay, toUploadablePng, type Underlay } from "./underlay.ts";
 import { useViewport } from "./useViewport.ts";
 
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
@@ -32,11 +39,64 @@ const GRID_METRES = 0.5;
 /** Overlaps smaller than this (m²) are drawing noise, not mistakes worth flagging. */
 const MIN_OVERLAP = 0.05;
 
-export function Editor() {
-	const [store] = useState(createEditorStore);
+type EditorProps = {
+	map: MapDetails;
+	/** The Draft as loaded from the server, and its sequence number. */
+	initial: { seq: number; draft: Draft };
+	onExit: () => void;
+};
+
+export function Editor({ map, initial, onExit }: EditorProps) {
+	const level = map.levels[0] as LevelDetails;
+	const [saveStatus, setSaveStatus] = useState<SyncStatus>("saved");
+	const [{ store, sync }] = useState(() => {
+		const sync = createDraftSync({
+			save: (baseSeq, operations) =>
+				api.saveOperations(map.id, baseSeq, operations),
+			seq: initial.seq,
+			onStatus: setSaveStatus,
+		});
+		const store = createEditorStore(initial.draft, {
+			onApplied: (operation) => sync.push(operation),
+		});
+		return { store, sync };
+	});
 	const { history, selection, error } = useStore(store);
 	const [toolName, setToolName] = useState<ToolName>("box");
 	const [underlay, setUnderlay] = useState<Underlay | null>(null);
+	const [uploading, setUploading] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (level.underlay)
+			void loadUnderlay(
+				api.underlayUrl(level.id),
+				level.underlay.pixelsPerMetre,
+			).then(setUnderlay);
+	}, [level]);
+
+	// Warn before leaving with edits that haven't reached the server.
+	useEffect(() => {
+		if (saveStatus === "saved") return;
+		const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+		window.addEventListener("beforeunload", warn);
+		return () => window.removeEventListener("beforeunload", warn);
+	}, [saveStatus]);
+
+	/** Uploads a floor plan for this Level (converted to PNG first) and shows it. */
+	const applyFloorPlan = async (file: Blob) => {
+		setUploading("Uploading floor plan…");
+		try {
+			await api.uploadUnderlay(level.id, await toUploadablePng(file));
+			setUnderlay(
+				await loadUnderlay(`${api.underlayUrl(level.id)}?v=${Date.now()}`),
+			);
+			setUploading(null);
+		} catch (e) {
+			setUploading(
+				`Couldn't use that floor plan: ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
+	};
 	const [opacity, setOpacity] = useState(0.6);
 	const [gridOn, setGridOn] = useState(false);
 	const [size, setSize] = useState({ width: 800, height: 600 });
@@ -44,7 +104,11 @@ export function Editor() {
 	const viewport = useViewport(size.width, size.height);
 
 	const draft = history.draft;
-	const spaces = useMemo(() => Object.values(draft.spaces), [draft]);
+	// The Draft covers the whole Map; show the Level being edited.
+	const spaces = useMemo(
+		() => Object.values(draft.spaces).filter((s) => s.levelId === level.id),
+		[draft, level],
+	);
 	const overlaps = useMemo(
 		() =>
 			findOverlaps(
@@ -82,6 +146,7 @@ export function Editor() {
 		store,
 		draft,
 		selection,
+		levelId: level.id,
 		scale: viewport.view.scale,
 		tolerance: SNAP_PIXELS / viewport.view.scale,
 		grid: gridOn ? GRID_METRES : undefined,
@@ -123,13 +188,16 @@ export function Editor() {
 		return () => window.removeEventListener("keydown", onKey);
 	}, [store]);
 
-	const open = async (src: string) => setUnderlay(await loadUnderlay(src));
-	const message = error ?? tool.status;
+	const message = error ?? uploading ?? tool.status;
 
 	return (
 		<div style={layout}>
 			<header style={toolbar}>
-				<strong>Kestrel</strong>
+				<button type="button" onClick={onExit} title="Back to your Maps">
+					←
+				</button>
+				<strong>{map.name}</strong>
+				<SaveIndicator status={saveStatus} />
 				<div style={group} role="toolbar" aria-label="Drawing tools">
 					{TOOLS.map((t) => (
 						<button
@@ -182,11 +250,18 @@ export function Editor() {
 							accept="image/*"
 							onChange={(e) => {
 								const file = e.target.files?.[0];
-								if (file) void open(URL.createObjectURL(file));
+								if (file) void applyFloorPlan(file);
 							}}
 						/>
 					</label>
-					<button type="button" onClick={() => void open("/sample-plan.svg")}>
+					<button
+						type="button"
+						onClick={async () =>
+							void applyFloorPlan(
+								await (await fetch("/sample-plan.svg")).blob(),
+							)
+						}
+					>
 						Use sample plan
 					</button>
 					<label>
@@ -211,6 +286,14 @@ export function Editor() {
 				</div>
 				{tool.options && <div style={group}>{tool.options}</div>}
 			</header>
+			{(saveStatus === "conflict" || saveStatus === "rejected") && (
+				<div role="alert" style={alertBar}>
+					{sync.error()} Your latest edits weren't saved.{" "}
+					<button type="button" onClick={() => window.location.reload()}>
+						Reload the Map
+					</button>
+				</div>
+			)}
 			<div
 				role="status"
 				style={statusBar(message !== null && message !== undefined)}
@@ -408,3 +491,31 @@ const listItem = (active: boolean): CSSProperties => ({
 	textAlign: "left",
 	cursor: "pointer",
 });
+
+const SAVE_LABELS: Record<SyncStatus, string> = {
+	saved: "All changes saved",
+	saving: "Saving…",
+	offline: "Offline – will retry",
+	conflict: "Not saved",
+	rejected: "Not saved",
+};
+
+function SaveIndicator({ status }: { status: SyncStatus }) {
+	const ok = status === "saved" || status === "saving";
+	return (
+		<span
+			data-testid="save-status"
+			style={{ color: ok ? "#64748b" : "#b91c1c" }}
+		>
+			{SAVE_LABELS[status]}
+		</span>
+	);
+}
+
+const alertBar: CSSProperties = {
+	gridColumn: "1 / -1",
+	padding: "8px 12px",
+	background: "#fee2e2",
+	borderBottom: "1px solid #fecaca",
+	color: "#7f1d1d",
+};

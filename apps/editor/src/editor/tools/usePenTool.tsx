@@ -2,7 +2,6 @@ import { type Point, type Snap, snap } from "@kestrel/geometry";
 import { useState } from "react";
 import { DraftOutline, SnapMarker } from "../shapes.tsx";
 import {
-	LEVEL_ID,
 	newSpaceId,
 	outlinesOf,
 	type Tool,
@@ -40,7 +39,7 @@ export function usePenTool(ctx: ToolContext): Tool {
 			type: "addSpace",
 			space: {
 				id: newSpaceId(),
-				levelId: LEVEL_ID,
+				levelId: ctx.levelId,
 				kind: "unit",
 				outline: corners,
 			},

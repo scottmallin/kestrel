@@ -11,7 +11,6 @@ import { useRef, useState } from "react";
 import { Line } from "react-konva";
 import { COLOURS, DraftOutline, SnapMarker } from "../shapes.tsx";
 import {
-	LEVEL_ID,
 	newSpaceId,
 	outlinesOf,
 	type Tool,
@@ -62,7 +61,7 @@ export function useFillTool(ctx: ToolContext): Tool {
 			type: "addSpace",
 			space: {
 				id: newSpaceId(),
-				levelId: LEVEL_ID,
+				levelId: ctx.levelId,
 				kind: "unit",
 				outline: proposal,
 			},
