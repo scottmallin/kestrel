@@ -40,6 +40,21 @@ describe("editor store", () => {
 		expect(store.getState().error).toBeNull();
 	});
 
+	it("reports every Operation it applies, including undo and redo, so they can be saved", () => {
+		const applied: string[] = [];
+		const store = createEditorStore(undefined, {
+			onApplied: (op) =>
+				applied.push(op.type === "addSpace" ? `add ${op.space.id}` : op.type),
+		});
+		store.getState().perform({ type: "addSpace", space: box("a", 0) });
+		store.getState().perform({ type: "removeSpaces", ids: ["ghost"] }); // rejected: not reported
+		store.getState().undo();
+		store.getState().redo();
+
+		// Redo re-applies the inverse of the undo, which for a removal is a replaceSpaces (ADR 0004).
+		expect(applied).toEqual(["add a", "removeSpaces", "replaceSpaces"]);
+	});
+
 	describe("selection", () => {
 		it("drops Spaces that undo takes away", () => {
 			const store = createEditorStore();

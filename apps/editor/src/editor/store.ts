@@ -22,7 +22,15 @@ export type EditorState = {
 	select: (ids: readonly string[]) => void;
 };
 
-export function createEditorStore(draft: Draft = emptyDraft()) {
+export type EditorStoreOptions = {
+	/** Called with each Operation actually applied, including the inverses that undo and redo apply. */
+	onApplied?: (operation: Operation) => void;
+};
+
+export function createEditorStore(
+	draft: Draft = emptyDraft(),
+	{ onApplied }: EditorStoreOptions = {},
+) {
 	return createStore<EditorState>()((set, get) => {
 		/** Moves to a new History, keeping only selected Spaces that still exist. */
 		const moveTo = (history: History) =>
@@ -38,11 +46,22 @@ export function createEditorStore(draft: Draft = emptyDraft()) {
 			error: null,
 			perform: (operation) => {
 				const result = perform(get().history, operation);
-				if (result.ok) moveTo(result.history);
-				else set({ error: result.error });
+				if (!result.ok) return set({ error: result.error });
+				moveTo(result.history);
+				onApplied?.(operation);
 			},
-			undo: () => moveTo(undo(get().history)),
-			redo: () => moveTo(redo(get().history)),
+			undo: () => {
+				const inverse = get().history.undoStack.at(-1);
+				if (!inverse) return;
+				moveTo(undo(get().history));
+				onApplied?.(inverse);
+			},
+			redo: () => {
+				const operation = get().history.redoStack.at(-1);
+				if (!operation) return;
+				moveTo(redo(get().history));
+				onApplied?.(operation);
+			},
 			select: (ids) =>
 				set({
 					selection: ids.filter((id) => id in get().history.draft.spaces),
