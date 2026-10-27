@@ -10,3 +10,4 @@ coverage/
 .astro/
 test-results/
 playwright-report/
+.data/

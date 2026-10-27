@@ -20,6 +20,8 @@ export type ToolContext = {
 	readonly store: EditorStore;
 	readonly draft: Draft;
 	readonly selection: readonly string[];
+	/** The Level being edited; new Spaces are drawn on it. */
+	readonly levelId: string;
 	/** Screen pixels per metre. */
 	readonly scale: number;
 	/** Snapping distance in metres (a fixed number of screen pixels). */
@@ -50,6 +52,3 @@ export const outlinesOf = (draft: Draft) =>
 	Object.values(draft.spaces).map((s) => s.outline);
 
 export const newSpaceId = () => crypto.randomUUID();
-
-/** The Level being edited, until Levels exist in the Draft. */
-export const LEVEL_ID = "level-1";

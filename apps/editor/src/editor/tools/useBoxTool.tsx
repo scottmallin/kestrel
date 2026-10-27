@@ -8,7 +8,6 @@ import {
 	SnapMarker,
 } from "../shapes.tsx";
 import {
-	LEVEL_ID,
 	newSpaceId,
 	outlinesOf,
 	type Tool,
@@ -247,7 +246,12 @@ export function useBoxTool(ctx: ToolContext): Tool {
 				// Deliberately not selected: its handles would sit where the next box starts (ADR 0002).
 				perform({
 					type: "addSpace",
-					space: { id: newSpaceId(), levelId: LEVEL_ID, kind: "unit", outline },
+					space: {
+						id: newSpaceId(),
+						levelId: ctx.levelId,
+						kind: "unit",
+						outline,
+					},
 				});
 			} else if (g.type === "move") {
 				if (g.offset.x === 0 && g.offset.y === 0) return;
