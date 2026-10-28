@@ -1,6 +1,11 @@
 import type { Point } from "@kestrel/geometry";
-import type { Operation, SpaceChanges } from "./draft.ts";
-import { SPACE_KINDS, type Space, type SpaceKind } from "./index.ts";
+import type { ListingChanges, Operation, SpaceChanges } from "./draft.ts";
+import {
+	type Listing,
+	SPACE_KINDS,
+	type Space,
+	type SpaceKind,
+} from "./index.ts";
 
 export type ParseResult<T> =
 	| { readonly ok: true; readonly value: T }
@@ -70,6 +75,63 @@ function space(value: unknown, what: string): Space {
 	};
 }
 
+/** Longest text accepted for each Listing field. */
+const LISTING_LIMITS = {
+	name: 120,
+	description: 1000,
+	website: 500,
+	hours: 200,
+	categoryId: 100,
+	logoKey: 300,
+} as const;
+
+function text(value: unknown, what: keyof typeof LISTING_LIMITS): string {
+	if (typeof value !== "string") fail(`${what} must be text`);
+	if (value.length > LISTING_LIMITS[what])
+		fail(`${what} must be at most ${LISTING_LIMITS[what]} characters`);
+	// Shown as a link in Embeds on customers' sites, so only real web addresses (never javascript: and the like).
+	if (what === "website" && !/^https?:\/\/\S+$/i.test(value))
+		fail("website must start with http:// or https://");
+	return value;
+}
+
+const OPTIONAL = [
+	"categoryId",
+	"logoKey",
+	"description",
+	"website",
+	"hours",
+] as const;
+
+function listing(value: unknown): Listing {
+	const l = record(value, "listing");
+	const optional: Record<string, string> = {};
+	for (const field of OPTIONAL)
+		if (l[field] !== undefined) optional[field] = text(l[field], field);
+	return {
+		id: string(l.id, "listing.id"),
+		name: text(l.name, "name"),
+		spaceIds: strings(l.spaceIds, "spaceIds"),
+		...optional,
+	};
+}
+
+function listingChanges(value: unknown): ListingChanges {
+	const c = record(value, "changes");
+	const optional: Record<string, string | null> = {};
+	for (const field of OPTIONAL) {
+		if (c[field] !== undefined)
+			optional[field] = c[field] === null ? null : text(c[field], field);
+	}
+	return {
+		...(c.name !== undefined && { name: text(c.name, "name") }),
+		...(c.spaceIds !== undefined && {
+			spaceIds: strings(c.spaceIds, "spaceIds"),
+		}),
+		...optional,
+	};
+}
+
 function changes(value: unknown): SpaceChanges {
 	const c = record(value, "changes");
 	return {
@@ -108,6 +170,16 @@ function operation(input: unknown): Operation {
 				id: string(o.id, "id"),
 				changes: changes(o.changes),
 			};
+		case "addListing":
+			return { type: "addListing", listing: listing(o.listing) };
+		case "updateListing":
+			return {
+				type: "updateListing",
+				id: string(o.id, "id"),
+				changes: listingChanges(o.changes),
+			};
+		case "removeListing":
+			return { type: "removeListing", id: string(o.id, "id") };
 		default:
 			return fail(`Unknown Operation type ${JSON.stringify(o.type)}`);
 	}

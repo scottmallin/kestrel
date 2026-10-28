@@ -64,7 +64,10 @@ function unit2(): Space {
 }
 
 function draftWith(...spaces: Space[]): Draft {
-	return { spaces: Object.fromEntries(spaces.map((s) => [s.id, s])) };
+	return {
+		spaces: Object.fromEntries(spaces.map((s) => [s.id, s])),
+		listings: {},
+	};
 }
 
 describe("replaceSpaces", () => {
