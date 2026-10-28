@@ -45,7 +45,13 @@ async function mapWithDraft() {
 describe("Publishing", () => {
 	it("publishes the saved Draft, and anyone can load it through the Embed", async () => {
 		const { save, publish, visit, levelId } = await mapWithDraft();
-		await save({ type: "addSpace", space: unit("a", 0, "Unit 1", levelId) });
+		await save(
+			{ type: "addSpace", space: unit("a", 0, "Unit 1", levelId) },
+			{
+				type: "addListing",
+				listing: { id: "boots", name: "Boots", spaceIds: ["a"] },
+			},
+		);
 
 		const published = await publish();
 		expect(published.statusCode).toBe(200);
@@ -57,7 +63,7 @@ describe("Publishing", () => {
 		expect(visitor.json()).toMatchObject({
 			map: { name: "Main mall" },
 			version: 1,
-			directory: [{ spaceId: "a", label: "Unit 1" }],
+			directory: [{ id: "boots", label: "Boots", spaceIds: ["a"] }],
 		});
 		expect(visitor.headers["access-control-allow-origin"]).toBe("*");
 		expect(visitor.headers["cache-control"]).toMatch(/public/);
@@ -65,9 +71,21 @@ describe("Publishing", () => {
 
 	it("serves the newest version after publishing again, through the same Embed", async () => {
 		const { save, publish, visit, levelId } = await mapWithDraft();
-		await save({ type: "addSpace", space: unit("a", 0, "Unit 1", levelId) });
+		await save(
+			{ type: "addSpace", space: unit("a", 0, "Unit 1", levelId) },
+			{
+				type: "addListing",
+				listing: { id: "boots", name: "Boots", spaceIds: ["a"] },
+			},
+		);
 		const first = (await publish()).json();
-		await save({ type: "addSpace", space: unit("b", 10, "Unit 2", levelId) });
+		await save(
+			{ type: "addSpace", space: unit("b", 10, "Unit 2", levelId) },
+			{
+				type: "addListing",
+				listing: { id: "zara", name: "Zara", spaceIds: ["b"] },
+			},
+		);
 
 		const second = (await publish()).json();
 
@@ -76,7 +94,7 @@ describe("Publishing", () => {
 			(await visit(first.embedId))
 				.json()
 				.directory.map((d: { label: string }) => d.label),
-		).toEqual(["Unit 1", "Unit 2"]);
+		).toEqual(["Boots", "Zara"]);
 	});
 
 	it("shows the Map's Embeds and latest Published Version to its Organisation", async () => {

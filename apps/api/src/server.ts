@@ -24,6 +24,9 @@ const auth = createAuth({
 		.split(",")
 		.filter(Boolean),
 });
-const app = buildApp({ db, auth, storage }, { logger: !ephemeral });
+const app = buildApp(
+	{ db, auth, storage, publicUrl: baseURL },
+	{ logger: !ephemeral },
+);
 
 await app.listen({ port, host: "0.0.0.0" });

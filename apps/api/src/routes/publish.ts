@@ -5,7 +5,7 @@ import { findMapForUser, isUuid } from "./access.ts";
 import { requireUser } from "./session.ts";
 
 export const publishRoutes =
-	({ db, auth, storage }: AppDeps) =>
+	({ db, auth, storage, publicUrl }: AppDeps) =>
 	async (app: FastifyInstance) => {
 		app.post<{ Params: { mapId: string } }>(
 			"/api/maps/:mapId/publish",
@@ -14,7 +14,7 @@ export const publishRoutes =
 				if (!user) return;
 				const map = await findMapForUser(db, request.params.mapId, user.userId);
 				if (!map) return reply.status(404).send({ error: "No such Map." });
-				return publishMap(db, storage, map, user.userId);
+				return publishMap(db, storage, publicUrl, map, user.userId);
 			},
 		);
 
