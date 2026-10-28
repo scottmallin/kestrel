@@ -113,6 +113,22 @@ describe("Logos", () => {
 		expect(served.headers["x-content-type-options"]).toBe("nosniff");
 	});
 
+	it("never serves anything but logos, such as a private floor plan", async () => {
+		const { owner, map, app } = await setUp();
+		const levelId = map.levels[0].id;
+		await owner.upload(`/api/levels/${levelId}/underlay`, png, "image/png");
+
+		for (const url of [
+			`/api/public/logos/../organisations/${owner.organisationId}/levels/${levelId}/underlay`,
+			"/api/public/logos/%2e%2e/%2e%2e/package.json",
+			`/api/public/logos/${owner.organisationId}/not-a-uuid.png`,
+		]) {
+			expect((await app.inject({ method: "GET", url })).statusCode, url).toBe(
+				404,
+			);
+		}
+	});
+
 	it("must be PNG, JPEG or WebP", async () => {
 		const { owner, map } = await setUp();
 		const svg = Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>");
