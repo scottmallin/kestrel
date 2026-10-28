@@ -16,6 +16,7 @@ export type MapDetails = {
 	published: { version: number; publishedAt: string } | null;
 	embeds: { id: string; name: string }[];
 };
+export type Category = { id: string; name: string };
 export type SignedInUser = { id: string; name: string; email: string };
 
 /** A request failed; `message` is safe to show to the user. */
@@ -131,5 +132,17 @@ export const api = {
 			body: png,
 			headers: { "content-type": "image/png" },
 		}),
+	listCategories: () => call<Category[]>("/api/categories"),
+	createCategory: (name: string) =>
+		call<Category>("/api/categories", json({ name })),
+
+	uploadLogo: (mapId: string, png: Blob) =>
+		call<{ logoKey: string }>(`/api/maps/${mapId}/logos`, {
+			method: "PUT",
+			body: png,
+			headers: { "content-type": "image/png" },
+		}),
+	logoUrl: (logoKey: string) => `/api/public/${logoKey}`,
+
 	underlayUrl: (levelId: string) => `/api/levels/${levelId}/underlay`,
 };

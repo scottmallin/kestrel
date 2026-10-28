@@ -1,4 +1,5 @@
 import type { Draft, Operation } from "@kestrel/domain";
+import { sql } from "drizzle-orm";
 import {
 	integer,
 	jsonb,
@@ -7,6 +8,7 @@ import {
 	real,
 	text,
 	timestamp,
+	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth-schema.ts";
@@ -97,3 +99,23 @@ export const embeds = pgTable("embed", {
 	name: text("name").notNull(),
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+/** An Organisation's grouping of Listings, shared by all its Maps (ADR 0006). */
+export const categories = pgTable(
+	"category",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		organizationId: text("organization_id")
+			.notNull()
+			.references(() => organization.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		createdAt: timestamp("created_at").notNull().defaultNow(),
+	},
+	// "Food" and "food" are the same Category.
+	(t) => [
+		uniqueIndex("category_organization_name").on(
+			t.organizationId,
+			sql`lower(${t.name})`,
+		),
+	],
+);

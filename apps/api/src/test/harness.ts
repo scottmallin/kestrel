@@ -11,7 +11,12 @@ export async function testApp() {
 		secret: "test-secret-at-least-32-characters-long",
 		baseURL: "http://localhost",
 	});
-	const app = buildApp({ db, auth, storage: memoryStorage() });
+	const app = buildApp({
+		db,
+		auth,
+		storage: memoryStorage(),
+		publicUrl: "http://localhost",
+	});
 	let users = 0;
 
 	/** Signs up a new user who owns a new Organisation, returning a cookie for their requests. */
@@ -46,7 +51,7 @@ export async function testApp() {
 		return {
 			organisationId: organisation.id,
 			request: (
-				method: "GET" | "POST" | "PUT",
+				method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
 				url: string,
 				payload?: object,
 			) =>

@@ -4,6 +4,7 @@ import {
 	emptyDraft,
 	type History,
 	type Operation,
+	parseOperation,
 	perform,
 	redo,
 	undo,
@@ -45,6 +46,9 @@ export function createEditorStore(
 			selection: [],
 			error: null,
 			perform: (operation) => {
+				// The server checks Operations the same way; refusing here keeps one bad field from stopping saves.
+				const parsed = parseOperation(operation);
+				if (!parsed.ok) return set({ error: parsed.error });
 				const result = perform(get().history, operation);
 				if (!result.ok) return set({ error: result.error });
 				moveTo(result.history);

@@ -34,7 +34,10 @@ async function newMap() {
 describe("Draft", () => {
 	it("starts empty", async () => {
 		const { load } = await newMap();
-		expect(await load()).toEqual({ seq: 0, draft: { spaces: {} } });
+		expect(await load()).toEqual({
+			seq: 0,
+			draft: { spaces: {}, listings: {} },
+		});
 	});
 
 	it("saves Operations and loads them back", async () => {
@@ -49,7 +52,7 @@ describe("Draft", () => {
 
 		expect(await load()).toEqual({
 			seq: 2,
-			draft: { spaces: { a: box("a", 0), b: box("b", 10) } },
+			draft: { spaces: { a: box("a", 0), b: box("b", 10) }, listings: {} },
 		});
 	});
 
@@ -76,7 +79,10 @@ describe("Draft", () => {
 		expect(invalid.json()).toEqual({
 			error: "Operation 2: No Space with id ghost",
 		});
-		expect(await load()).toEqual({ seq: 0, draft: { spaces: {} } });
+		expect(await load()).toEqual({
+			seq: 0,
+			draft: { spaces: {}, listings: {} },
+		});
 	});
 
 	it("refuses malformed requests without touching the Draft", async () => {
@@ -103,7 +109,10 @@ describe("Draft", () => {
 				400,
 			);
 		}
-		expect(await load()).toEqual({ seq: 0, draft: { spaces: {} } });
+		expect(await load()).toEqual({
+			seq: 0,
+			draft: { spaces: {}, listings: {} },
+		});
 	});
 
 	it("keeps loading the right Draft once snapshots are taken", async () => {

@@ -3,23 +3,14 @@ import { asc, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AppDeps } from "../app.ts";
 import { embeds, levels, publishedVersions } from "../db/schema.ts";
+import { isImageUpload } from "../images.ts";
 import { DEFAULT_PIXELS_PER_METRE } from "../underlay.ts";
 import { findLevelForUser, findMapForUser } from "./access.ts";
 import { requireUser } from "./session.ts";
 
-/** Raster formats only: an uploaded SVG could run script on the API's origin. */
-const UNDERLAY_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const MAX_UNDERLAY_BYTES = 20 * 1024 * 1024;
-
 export const levelRoutes =
 	({ db, auth, storage }: AppDeps) =>
 	async (app: FastifyInstance) => {
-		app.addContentTypeParser(
-			UNDERLAY_TYPES,
-			{ parseAs: "buffer", bodyLimit: MAX_UNDERLAY_BYTES },
-			(_req, body, done) => done(null, body),
-		);
-
 		app.get<{ Params: { mapId: string } }>(
 			"/api/maps/:mapId",
 			async (request, reply) => {
@@ -85,10 +76,7 @@ export const levelRoutes =
 				);
 				if (!found) return reply.status(404).send({ error: "No such Level." });
 				const contentType = request.headers["content-type"] ?? "";
-				if (
-					!UNDERLAY_TYPES.includes(contentType) ||
-					!Buffer.isBuffer(request.body)
-				) {
+				if (!isImageUpload(contentType, request.body)) {
 					return reply.status(415).send({
 						error: "Upload the floor plan as a PNG, JPEG or WebP image.",
 					});

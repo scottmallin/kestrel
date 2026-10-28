@@ -19,7 +19,10 @@ export async function loadDraft(
 		.where(eq(draftSnapshots.mapId, mapId))
 		.orderBy(desc(draftSnapshots.seq))
 		.limit(1);
-	let draft = snapshot?.draft ?? emptyDraft();
+	// Snapshots taken before Listings existed have no `listings`; old data must keep loading (ADR 0005).
+	let draft: Draft = snapshot
+		? { ...emptyDraft(), ...snapshot.draft }
+		: emptyDraft();
 	let seq = snapshot?.seq ?? 0;
 	const later = await db
 		.select()

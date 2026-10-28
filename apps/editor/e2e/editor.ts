@@ -54,8 +54,9 @@ export async function openEditor(
 
 	const editor = {
 		canvas,
+		/** Rows of the side panel's "All Spaces" list. */
 		spaces: page
-			.getByRole("complementary", { name: "Spaces" })
+			.getByRole("region", { name: "All Spaces" })
 			.getByRole("listitem"),
 		status: page.getByRole("status"),
 		async click(at: Metres) {
@@ -82,4 +83,42 @@ export async function openEditor(
 				.getByRole("button", { name }),
 	};
 	return editor;
+}
+
+type Editor = Awaited<ReturnType<typeof openEditor>>;
+
+/** Draws an 8 m box at x and places a new Listing called `name` in it, from the side panel. */
+export async function placeListing(
+	page: Page,
+	editor: Editor,
+	x: number,
+	name: string,
+) {
+	await editor.drag({ x, y: 2 }, { x: x + 8, y: 10 });
+	await editor.click({ x: x + 4, y: 6 });
+	await page.getByLabel("Add a Listing").fill(name);
+	await page.getByLabel("Add a Listing").press("Enter");
+	await expect(
+		page
+			.getByRole("region", { name: "Selected Space" })
+			.getByRole("button", { name, exact: true }),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+}
+
+/** Publishes, then opens the Embed from the embed code. Fails the test on any console error in the Embed. */
+export async function publishAndOpenEmbed(page: Page) {
+	page.on("console", (message) => {
+		if (message.type() === "error" && page.url().includes("embed=")) {
+			throw new Error(
+				`Embed console error: ${message.text()} (${message.location().url})`,
+			);
+		}
+	});
+	await page.getByRole("button", { name: "Publish" }).click();
+	const code = await page.getByLabel("Embed code").inputValue();
+	const src = code.match(/src="([^"]+)"/)?.[1];
+	if (!src) throw new Error(`No src in embed code: ${code}`);
+	await page.goto(src);
+	return src;
 }

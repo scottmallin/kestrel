@@ -1,4 +1,4 @@
-import type { Draft, Space } from "@kestrel/domain";
+import type { Draft, Listing, Space } from "@kestrel/domain";
 import { describe, expect, it } from "vitest";
 import { compileBundle, METRES_PER_DEGREE } from "./compile.ts";
 
@@ -15,14 +15,18 @@ const unit = (id: string, x: number, reference?: string): Space => ({
 		{ x, y: 8 },
 	],
 });
-const draftOf = (...spaces: Space[]): Draft => ({
+const draftOf = (...spaces: Space[]): Draft => withListings(spaces);
+const withListings = (spaces: Space[], ...listings: Listing[]): Draft => ({
 	spaces: Object.fromEntries(spaces.map((s) => [s.id, s])),
+	listings: Object.fromEntries(listings.map((l) => [l.id, l])),
 });
 
 const compile = (draft: Draft) =>
 	compileBundle({
 		map: { id: "M1", name: "Main mall" },
 		levels: [level],
+		categories: [{ id: "health", name: "Health & beauty" }],
+		logoUrl: (key) => `https://cdn.example/${key}`,
 		draft,
 		version: 3,
 		publishedAt: "2026-10-27T12:00:00.000Z",
@@ -42,6 +46,7 @@ describe("compileBundle", () => {
 			levelId: "L0",
 			kind: "unit",
 			reference: "Unit 1",
+			label: "Unit 1",
 			area: 80,
 		});
 		const ring = feature?.geometry.coordinates[0] ?? [];
@@ -63,22 +68,108 @@ describe("compileBundle", () => {
 		}
 	});
 
-	it("lists referenced Spaces in the directory, in natural order", () => {
-		const corridor: Space = { ...unit("c", 40), kind: "corridor" };
-		const bundle = compile(
-			draftOf(
-				unit("a", 0, "Unit 10"),
-				unit("b", 10, "Unit 2"),
-				corridor,
-				unit("d", 20, "Toilets"),
-			),
-		);
+	describe("Listings", () => {
+		const boots: Listing = {
+			id: "boots",
+			name: "Boots",
+			categoryId: "health",
+			spaceIds: ["a", "gone"],
+			logoKey: "logos/boots.png",
+		};
+		const zara: Listing = {
+			id: "zara",
+			name: "Zara",
+			spaceIds: ["b"],
+			website: "https://zara.com",
+		};
+		const unplaced: Listing = { id: "hmv", name: "HMV", spaceIds: ["gone"] };
+		const spaces = [
+			unit("a", 0, "Unit 1"),
+			unit("b", 10, "Unit 2"),
+			unit("c", 20, "Unit 3"),
+		];
 
-		expect(bundle.directory).toEqual([
-			{ spaceId: "d", levelId: "L0", label: "Toilets", kind: "unit" },
-			{ spaceId: "b", levelId: "L0", label: "Unit 2", kind: "unit" },
-			{ spaceId: "a", levelId: "L0", label: "Unit 10", kind: "unit" },
-		]);
+		it("publishes placed Listings with their Category and logo, keeping only Spaces that exist", () => {
+			const bundle = compile(withListings(spaces, boots, zara, unplaced));
+
+			expect(bundle.listings).toEqual([
+				{
+					id: "boots",
+					name: "Boots",
+					categoryId: "health",
+					spaceIds: ["a"],
+					logoUrl: "https://cdn.example/logos/boots.png",
+				},
+				{
+					id: "zara",
+					name: "Zara",
+					spaceIds: ["b"],
+					website: "https://zara.com",
+				},
+			]);
+			expect(bundle.categories).toEqual([
+				{ id: "health", name: "Health & beauty" },
+			]);
+		});
+
+		it("lists Listings and facilities in the directory; vacant units drop out", () => {
+			const toilets: Space = { ...unit("t", 30), kind: "toilet" };
+			const lift: Space = { ...unit("l", 40, "Lift A"), kind: "lift" };
+			const bundle = compile(
+				withListings([...spaces, toilets, lift], boots, zara, unplaced),
+			);
+
+			expect(bundle.directory).toEqual([
+				{
+					id: "boots",
+					label: "Boots",
+					detail: "Health & beauty",
+					categoryId: "health",
+					spaceIds: ["a"],
+				},
+				{
+					id: "l",
+					label: "Lift A",
+					detail: "Lift",
+					categoryId: null,
+					spaceIds: ["l"],
+				},
+				{
+					id: "t",
+					label: "Toilets",
+					detail: "",
+					categoryId: null,
+					spaceIds: ["t"],
+				},
+				{
+					id: "zara",
+					label: "Zara",
+					detail: "",
+					categoryId: null,
+					spaceIds: ["b"],
+				},
+			]);
+		});
+
+		it("treats a Category that no longer exists as none", () => {
+			const bundle = compile(
+				withListings(spaces, { ...zara, categoryId: "deleted" }),
+			);
+			expect(bundle.listings[0]).not.toHaveProperty("categoryId");
+			expect(bundle.directory[0]).toMatchObject({
+				detail: "",
+				categoryId: null,
+			});
+		});
+
+		it("labels a Space on the map with its Listing's name, else its Space Reference", () => {
+			const bundle = compile(withListings(spaces, boots, zara));
+			expect(bundle.spaces.features.map((f) => f.properties.label)).toEqual([
+				"Boots",
+				"Zara",
+				"Unit 3",
+			]);
+		});
 	});
 
 	it("records the bounds of everything drawn, so the Embed can fit it", () => {

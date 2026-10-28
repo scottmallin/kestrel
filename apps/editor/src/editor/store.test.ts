@@ -55,6 +55,24 @@ describe("editor store", () => {
 		expect(applied).toEqual(["add a", "removeSpaces", "replaceSpaces"]);
 	});
 
+	it("refuses an Operation the server would refuse, without applying or reporting it", () => {
+		const applied: unknown[] = [];
+		const store = createEditorStore(undefined, {
+			onApplied: (op) => applied.push(op),
+		});
+
+		store.getState().perform({
+			type: "addListing",
+			listing: { id: "x", name: "X", spaceIds: [], website: "boots.com" },
+		});
+
+		expect(store.getState().error).toBe(
+			"website must start with http:// or https://",
+		);
+		expect(store.getState().history.draft.listings).toEqual({});
+		expect(applied).toEqual([]);
+	});
+
 	describe("selection", () => {
 		it("drops Spaces that undo takes away", () => {
 			const store = createEditorStore();

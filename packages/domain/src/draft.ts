@@ -1,7 +1,10 @@
-import type { Space, SpaceKind } from "./index.ts";
+import type { Listing, Space, SpaceKind } from "./index.ts";
 
-/** The editable Spaces of the Level being edited, by id. */
-export type Draft = { readonly spaces: Readonly<Record<string, Space>> };
+/** The editable working copy of a Map: its Spaces and Listings, by id. */
+export type Draft = {
+	readonly spaces: Readonly<Record<string, Space>>;
+	readonly listings: Readonly<Record<string, Listing>>;
+};
 
 export type Operation =
 	| { readonly type: "addSpace"; readonly space: Space }
@@ -20,7 +23,30 @@ export type Operation =
 			readonly type: "updateSpace";
 			readonly id: string;
 			readonly changes: SpaceChanges;
-	  };
+	  }
+	| { readonly type: "addListing"; readonly listing: Listing }
+	| {
+			readonly type: "updateListing";
+			readonly id: string;
+			readonly changes: ListingChanges;
+	  }
+	| { readonly type: "removeListing"; readonly id: string };
+
+/** Optional details of a Listing; null clears one. */
+const OPTIONAL_LISTING_FIELDS = [
+	"categoryId",
+	"logoKey",
+	"description",
+	"website",
+	"hours",
+] as const;
+type OptionalListingField = (typeof OPTIONAL_LISTING_FIELDS)[number];
+
+/** Changes to a Listing: its name, placement, and any optional detail (null clears it). */
+export type ListingChanges = {
+	readonly name?: string;
+	readonly spaceIds?: readonly string[];
+} & { readonly [K in OptionalListingField]?: string | null };
 
 /** Details of a Space other than its outline; a null reference clears it. */
 export type SpaceChanges = {
@@ -32,7 +58,7 @@ export type ApplyResult =
 	| { readonly ok: true; readonly draft: Draft; readonly inverse: Operation }
 	| { readonly ok: false; readonly error: string };
 
-export const emptyDraft = (): Draft => ({ spaces: {} });
+export const emptyDraft = (): Draft => ({ spaces: {}, listings: {} });
 
 export function applyOperation(
 	draft: Draft,
@@ -88,6 +114,73 @@ export function applyOperation(
 				changes: previous,
 			});
 		}
+		case "addListing": {
+			const { listing } = operation;
+			if (draft.listings[listing.id])
+				return {
+					ok: false,
+					error: `A Listing with id ${listing.id} already exists`,
+				};
+			if (!listing.name.trim())
+				return { ok: false, error: `Listing ${listing.id} needs a name` };
+			return {
+				ok: true,
+				draft: {
+					...draft,
+					listings: { ...draft.listings, [listing.id]: listing },
+				},
+				inverse: { type: "removeListing", id: listing.id },
+			};
+		}
+		case "updateListing": {
+			const listing = draft.listings[operation.id];
+			if (!listing)
+				return { ok: false, error: `No Listing with id ${operation.id}` };
+			const { changes } = operation;
+			if (changes.name !== undefined && !changes.name.trim()) {
+				return { ok: false, error: `Listing ${listing.id} needs a name` };
+			}
+			const updated: Record<string, unknown> = { ...listing };
+			const previous: Record<string, unknown> = {};
+			if (changes.name !== undefined) {
+				previous.name = listing.name;
+				updated.name = changes.name;
+			}
+			if (changes.spaceIds !== undefined) {
+				previous.spaceIds = listing.spaceIds;
+				updated.spaceIds = changes.spaceIds;
+			}
+			for (const field of OPTIONAL_LISTING_FIELDS) {
+				const change = changes[field];
+				if (change === undefined) continue;
+				previous[field] = listing[field] ?? null;
+				if (change === null) delete updated[field];
+				else updated[field] = change;
+			}
+			return {
+				ok: true,
+				draft: {
+					...draft,
+					listings: { ...draft.listings, [listing.id]: updated as Listing },
+				},
+				inverse: {
+					type: "updateListing",
+					id: listing.id,
+					changes: previous as ListingChanges,
+				},
+			};
+		}
+		case "removeListing": {
+			const listing = draft.listings[operation.id];
+			if (!listing)
+				return { ok: false, error: `No Listing with id ${operation.id}` };
+			const { [operation.id]: _, ...listings } = draft.listings;
+			return {
+				ok: true,
+				draft: { ...draft, listings },
+				inverse: { type: "addListing", listing },
+			};
+		}
 	}
 }
 
@@ -115,7 +208,7 @@ function replace(
 	}
 	return {
 		ok: true,
-		draft: { spaces },
+		draft: { ...draft, spaces },
 		inverse: inverse ?? {
 			type: "replaceSpaces",
 			remove: add.map((s) => s.id),

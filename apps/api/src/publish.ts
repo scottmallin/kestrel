@@ -1,7 +1,7 @@
 import { compileBundle } from "@kestrel/publish";
 import { asc, desc, eq } from "drizzle-orm";
 import type { Db } from "./db/client.ts";
-import { embeds, levels, publishedVersions } from "./db/schema.ts";
+import { categories, embeds, levels, publishedVersions } from "./db/schema.ts";
 import { loadDraft } from "./draft.ts";
 import type { Storage } from "./storage.ts";
 
@@ -14,23 +14,31 @@ type MapRef = { id: string; name: string; organizationId: string };
 export async function publishMap(
 	db: Db,
 	storage: Storage,
+	/** Where the API is publicly reachable; logo URLs in the bundle start here. */
+	publicUrl: string,
 	map: MapRef,
 	userId: string,
 ) {
-	const [{ seq, draft }, levelRows, [latest]] = await Promise.all([
-		loadDraft(db, map.id),
-		db
-			.select()
-			.from(levels)
-			.where(eq(levels.mapId, map.id))
-			.orderBy(asc(levels.ordinal)),
-		db
-			.select({ version: publishedVersions.version })
-			.from(publishedVersions)
-			.where(eq(publishedVersions.mapId, map.id))
-			.orderBy(desc(publishedVersions.version))
-			.limit(1),
-	]);
+	const [{ seq, draft }, levelRows, categoryRows, [latest]] = await Promise.all(
+		[
+			loadDraft(db, map.id),
+			db
+				.select()
+				.from(levels)
+				.where(eq(levels.mapId, map.id))
+				.orderBy(asc(levels.ordinal)),
+			db
+				.select({ id: categories.id, name: categories.name })
+				.from(categories)
+				.where(eq(categories.organizationId, map.organizationId)),
+			db
+				.select({ version: publishedVersions.version })
+				.from(publishedVersions)
+				.where(eq(publishedVersions.mapId, map.id))
+				.orderBy(desc(publishedVersions.version))
+				.limit(1),
+		],
+	);
 	const version = (latest?.version ?? 0) + 1;
 	const bundle = compileBundle({
 		map: { id: map.id, name: map.name },
@@ -39,6 +47,8 @@ export async function publishMap(
 			name: l.name,
 			ordinal: l.ordinal,
 		})),
+		categories: categoryRows,
+		logoUrl: (key) => `${publicUrl}/api/public/${key}`,
 		draft,
 		version,
 		publishedAt: new Date().toISOString(),

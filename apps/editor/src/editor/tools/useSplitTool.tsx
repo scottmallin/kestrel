@@ -66,8 +66,14 @@ export function useSplitTool(ctx: ToolContext): Tool {
 				type: "replaceSpaces",
 				remove: cut.map((c) => c.space.id),
 				add: cut.flatMap(({ space, pieces }) =>
-					pieces.map((outline) => ({
-						id: newSpaceId(),
+					// The first piece keeps the original id (and reference), so its Listings stay placed (ADR 0006).
+					pieces.map((outline, i) => ({
+						...(i === 0
+							? {
+									id: space.id,
+									...(space.reference && { reference: space.reference }),
+								}
+							: { id: newSpaceId() }),
 						levelId: space.levelId,
 						kind: space.kind,
 						outline,

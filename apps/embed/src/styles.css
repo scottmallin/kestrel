@@ -10,6 +10,11 @@
 		sans-serif;
 	color: var(--text);
 }
+/* Author display rules (e.g. .search { display: grid }) would otherwise override the hidden attribute. */
+[hidden] {
+	/* biome-ignore lint/complexity/noImportantStyles: the hidden attribute must beat every display rule */
+	display: none !important;
+}
 html,
 body {
 	margin: 0;
@@ -53,7 +58,8 @@ body {
 	gap: 4px;
 	font-weight: 600;
 }
-.search input {
+.search input,
+.search select {
 	font: inherit;
 	padding: 8px 10px;
 	border: 1px solid #94a3b8;
@@ -88,7 +94,9 @@ body {
 	background: #eef3ff;
 }
 .results button:focus-visible,
-.search input:focus-visible {
+.search input:focus-visible,
+.search select:focus-visible,
+.details a:focus-visible {
 	outline: 3px solid var(--accent);
 	outline-offset: 1px;
 }
@@ -106,4 +114,36 @@ body {
 }
 .problem {
 	padding: 24px;
+}
+.search + .search {
+	margin-top: 8px;
+}
+.entry {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.entry img {
+	width: 28px;
+	height: 28px;
+	object-fit: contain;
+}
+.details {
+	margin-top: 12px;
+	padding: 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+}
+.details h2 {
+	margin: 0 0 4px;
+	font-size: 16px;
+}
+.details img {
+	max-width: 64px;
+	max-height: 64px;
+	float: right;
+	margin-left: 8px;
+}
+.details p {
+	margin: 4px 0;
 }
