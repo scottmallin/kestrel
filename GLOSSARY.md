@@ -51,6 +51,10 @@ Describes a Space Kind (such as a unit, office or kiosk) whose Spaces are offere
 Describes a Lettable Space that has no current Listing. It's worked out from that, never set by hand.
 _Avoid_: Empty, available, void
 
+**Facility**:
+A Space whose Space Kind Visitors look for directly (toilets, lifts, stairs, escalators, entrances), so it appears in the directory even without a Listing.
+_Avoid_: Service, utility
+
 **Amenity**:
 A facility shown as an icon at a single point on a Level (such as an ATM, defibrillator or info desk), with no drawn area.
 _Avoid_: Marker, pin, POI, icon
