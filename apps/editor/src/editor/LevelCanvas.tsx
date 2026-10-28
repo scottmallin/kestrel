@@ -15,6 +15,8 @@ type Props = {
 	spaces: readonly Space[];
 	selection: readonly string[];
 	overlaps: readonly Overlap[];
+	/** Listing names by Space id, for labels. */
+	listingNames: ReadonlyMap<string, string>;
 	underlay: Underlay | null;
 	underlayOpacity: number;
 };
@@ -28,6 +30,7 @@ export function LevelCanvas({
 	spaces,
 	selection,
 	overlaps,
+	listingNames,
 	underlay,
 	underlayOpacity,
 }: Props) {
@@ -134,6 +137,7 @@ export function LevelCanvas({
 						preview={tool.preview}
 						selection={selection}
 						overlaps={overlaps}
+						listingNames={listingNames}
 						scale={view.scale}
 					/>
 					{tool.overlay}

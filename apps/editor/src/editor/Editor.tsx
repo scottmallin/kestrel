@@ -1,10 +1,5 @@
-import {
-	type Draft,
-	SPACE_KINDS,
-	type Space,
-	type SpaceKind,
-} from "@kestrel/domain";
-import { findOverlaps, polygonArea } from "@kestrel/geometry";
+import type { Draft } from "@kestrel/domain";
+import { findOverlaps } from "@kestrel/geometry";
 import {
 	type CSSProperties,
 	useEffect,
@@ -13,11 +8,17 @@ import {
 	useState,
 } from "react";
 import { useStore } from "zustand";
-import { api, type LevelDetails, type MapDetails } from "../api.ts";
+import {
+	api,
+	type Category,
+	type LevelDetails,
+	type MapDetails,
+} from "../api.ts";
 import { deleteSelection, mergeSelection } from "./actions.ts";
 import { LevelCanvas } from "./LevelCanvas.tsx";
 import { PublishPanel } from "./PublishPanel.tsx";
-import { createEditorStore, type EditorStore } from "./store.ts";
+import { SidePanel } from "./SidePanel.tsx";
+import { createEditorStore } from "./store.ts";
 import { createDraftSync, type SyncStatus } from "./sync.ts";
 import type { ToolContext, ToolName } from "./tool.ts";
 import { useBoxTool } from "./tools/useBoxTool.tsx";
@@ -138,6 +139,24 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		() => Object.values(draft.spaces).filter((s) => s.levelId === level.id),
 		[draft, level],
 	);
+	const listings = useMemo(() => Object.values(draft.listings), [draft]);
+	const existingSpaceIds = useMemo(
+		() => new Set(Object.keys(draft.spaces)),
+		[draft],
+	);
+	// A Space is labelled with the first Listing placed in it.
+	const listingNames = useMemo(() => {
+		const names = new Map<string, string>();
+		for (const listing of listings) {
+			for (const id of listing.spaceIds)
+				if (!names.has(id)) names.set(id, listing.name);
+		}
+		return names;
+	}, [listings]);
+	const [categories, setCategories] = useState<Category[]>([]);
+	useEffect(() => {
+		api.listCategories().then(setCategories, () => setCategories([]));
+	}, []);
 	const overlaps = useMemo(
 		() =>
 			findOverlaps(
@@ -193,7 +212,14 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	latestTool.current = tool;
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if ((e.target as HTMLElement).closest("input, textarea, select")) return;
+			const field = (e.target as HTMLElement).closest<HTMLElement>(
+				"input, textarea, select",
+			);
+			if (field) {
+				// Esc leaves a text field, so shortcuts work again without reaching for the mouse.
+				if (e.key === "Escape") field.blur();
+				return;
+			}
 			if (latestTool.current.onKeyDown?.(e)) return e.preventDefault();
 			const { undo, redo, select } = store.getState();
 			const command = e.ctrlKey || e.metaKey;
@@ -358,6 +384,7 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 					spaces={spaces}
 					selection={selection}
 					overlaps={overlaps}
+					listingNames={listingNames}
 					underlay={underlay}
 					underlayOpacity={opacity}
 				/>
@@ -372,7 +399,16 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 			</div>
 			<SidePanel
 				store={store}
+				mapId={map.id}
 				spaces={spaces}
+				listings={listings}
+				existingSpaceIds={existingSpaceIds}
+				categories={categories}
+				onCreateCategory={async (name) => {
+					const category = await api.createCategory(name);
+					setCategories((all) => [...all, category]);
+					return category;
+				}}
 				selection={selection}
 				overlapCount={overlaps.length}
 			/>
@@ -380,112 +416,10 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	);
 }
 
-function SidePanel({
-	store,
-	spaces,
-	selection,
-	overlapCount,
-}: {
-	store: EditorStore;
-	spaces: readonly Space[];
-	selection: readonly string[];
-	overlapCount: number;
-}) {
-	const selected =
-		selection.length === 1
-			? spaces.find((s) => s.id === selection[0])
-			: undefined;
-	const { perform, select } = store.getState();
-	return (
-		<aside style={panel} aria-label="Spaces">
-			{selected && (
-				<section>
-					<h2 style={heading}>Selected Space</h2>
-					<label style={field}>
-						Space Reference
-						<input
-							key={selected.id}
-							defaultValue={selected.reference ?? ""}
-							placeholder="e.g. Unit 14"
-							onBlur={(e) => {
-								const reference = e.target.value.trim() || null;
-								if (reference !== (selected.reference ?? null)) {
-									perform({
-										type: "updateSpace",
-										id: selected.id,
-										changes: { reference },
-									});
-								}
-							}}
-							onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-						/>
-					</label>
-					<label style={field}>
-						Space Kind
-						<select
-							value={selected.kind}
-							onChange={(e) =>
-								perform({
-									type: "updateSpace",
-									id: selected.id,
-									changes: { kind: e.target.value as SpaceKind },
-								})
-							}
-						>
-							{SPACE_KINDS.map((kind) => (
-								<option key={kind} value={kind}>
-									{kind}
-								</option>
-							))}
-						</select>
-					</label>
-					<p style={{ margin: "4px 0" }}>
-						{polygonArea(selected.outline).toFixed(1)} m²
-					</p>
-				</section>
-			)}
-			<h2 style={heading}>
-				Spaces ({spaces.length})
-				{overlapCount > 0 && (
-					<span style={{ color: "#dc2626" }}>
-						{" "}
-						· {overlapCount} overlapping
-					</span>
-				)}
-			</h2>
-			{spaces.length === 0 && (
-				<p style={{ color: "#64748b" }}>Nothing drawn yet.</p>
-			)}
-			<ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-				{spaces.map((space) => (
-					<li key={space.id}>
-						<button
-							type="button"
-							style={listItem(selection.includes(space.id))}
-							onClick={(e) =>
-								select(
-									e.shiftKey
-										? selection.includes(space.id)
-											? selection.filter((id) => id !== space.id)
-											: [...selection, space.id]
-										: [space.id],
-								)
-							}
-						>
-							<span>{space.reference ?? <em>{space.kind}</em>}</span>
-							<span>{polygonArea(space.outline).toFixed(1)} m²</span>
-						</button>
-					</li>
-				))}
-			</ul>
-		</aside>
-	);
-}
-
 const layout: CSSProperties = {
 	display: "grid",
 	gridTemplateRows: "auto auto 1fr",
-	gridTemplateColumns: "1fr 280px",
+	gridTemplateColumns: "1fr 320px",
 	height: "100%",
 	font: "13px system-ui, sans-serif",
 };
@@ -513,33 +447,6 @@ const statusBar = (problem: boolean): CSSProperties => ({
 	padding: "6px 12px",
 	background: problem ? "#fee2e2" : "#fef9c3",
 	borderBottom: `1px solid ${problem ? "#fecaca" : "#fde68a"}`,
-});
-const panel: CSSProperties = {
-	gridRow: 3,
-	gridColumn: 2,
-	overflow: "auto",
-	padding: "8px 12px",
-	background: "#fff",
-	borderLeft: "1px solid #e2e8f0",
-};
-const heading: CSSProperties = {
-	fontSize: 12,
-	textTransform: "uppercase",
-	color: "#64748b",
-	margin: "12px 0 6px",
-};
-const field: CSSProperties = { display: "grid", gap: 2, marginBottom: 8 };
-const listItem = (active: boolean): CSSProperties => ({
-	display: "flex",
-	justifyContent: "space-between",
-	width: "100%",
-	padding: "4px 6px",
-	border: "none",
-	borderRadius: 4,
-	background: active ? "#dbe7ff" : "transparent",
-	font: "inherit",
-	textAlign: "left",
-	cursor: "pointer",
 });
 
 const SAVE_LABELS: Record<SyncStatus, string> = {

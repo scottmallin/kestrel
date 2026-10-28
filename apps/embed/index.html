@@ -16,8 +16,13 @@
 					<span>Find a place</span>
 					<input id="search" type="search" autocomplete="off" disabled />
 				</label>
+				<label class="search" id="category-filter" hidden>
+					<span>Category</span>
+					<select id="category"><option value="">All</option></select>
+				</label>
 				<p id="results-count" class="count" role="status" aria-live="polite"></p>
 				<ul id="results" class="results"></ul>
+				<article id="details" class="details" aria-live="polite" hidden></article>
 			</section>
 		</main>
 		<script type="module" src="/src/main.ts"></script>

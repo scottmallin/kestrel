@@ -31,13 +31,16 @@ export async function loadUnderlay(
  * Converts any image the browser can read (PNG, JPEG, SVG…) into a PNG of at most MAX_PIXELS on a white
  * background, ready to upload. The server only stores raster images, so an SVG never reaches it.
  */
-export async function toUploadablePng(file: Blob): Promise<Blob> {
+export async function toUploadablePng(
+	file: Blob,
+	maxPixels = MAX_PIXELS,
+): Promise<Blob> {
 	const url = URL.createObjectURL(file);
 	try {
 		const image = await decode(url);
 		const ratio = Math.min(
 			1,
-			MAX_PIXELS / Math.max(image.naturalWidth, image.naturalHeight),
+			maxPixels / Math.max(image.naturalWidth, image.naturalHeight),
 		);
 		const canvas = document.createElement("canvas");
 		canvas.width = Math.round(image.naturalWidth * ratio);

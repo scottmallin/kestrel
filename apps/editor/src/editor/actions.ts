@@ -1,7 +1,6 @@
 import type { Space } from "@kestrel/domain";
 import { mergeOutlines } from "@kestrel/geometry";
 import type { EditorStore } from "./store.ts";
-import { newSpaceId } from "./tool.ts";
 
 /** Joins the selected Spaces into one, keeping the first one's details. */
 export function mergeSelection(store: EditorStore) {
@@ -23,7 +22,8 @@ export function mergeSelection(store: EditorStore) {
 		return;
 	}
 	const [first] = chosen as [Space];
-	const id = newSpaceId();
+	// The merged Space keeps the first one's id, so its Listings stay placed (ADR 0006).
+	const id = first.id;
 	perform({
 		type: "replaceSpaces",
 		remove: chosen.map((s) => s.id),

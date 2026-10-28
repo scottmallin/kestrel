@@ -36,6 +36,8 @@ type SpacesProps = {
 	preview: Readonly<Record<string, Polygon>> | undefined;
 	selection: readonly string[];
 	overlaps: readonly Overlap[];
+	/** Listing names by Space id; a Space shows its Listing's name ahead of its Space Reference. */
+	listingNames: ReadonlyMap<string, string>;
 	scale: number;
 };
 
@@ -45,6 +47,7 @@ export function SpaceShapes({
 	preview,
 	selection,
 	overlaps,
+	listingNames,
 	scale,
 }: SpacesProps) {
 	return (
@@ -53,7 +56,9 @@ export function SpaceShapes({
 				const outline = preview?.[space.id] ?? space.outline;
 				const selected = selection.includes(space.id);
 				const middle = centre(outline);
-				const label = `${space.reference ?? space.kind}\n${polygonArea(outline).toFixed(1)} m²`;
+				const name =
+					listingNames.get(space.id) ?? space.reference ?? space.kind;
+				const label = `${name}\n${polygonArea(outline).toFixed(1)} m²`;
 				return (
 					<Group key={space.id}>
 						<Line
