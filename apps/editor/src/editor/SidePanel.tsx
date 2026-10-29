@@ -40,12 +40,19 @@ export function SidePanel(props: Props) {
 	const isPlaced = (l: Listing) =>
 		l.spaceIds.some((id) => existingSpaceIds.has(id));
 
-	/** Opens a Listing for editing, selecting the Spaces it's in. */
+	/** Opens a Listing for editing, showing the Level it's on and selecting its Spaces there. */
 	const openListing = (listing: Listing) => {
 		setEditingId(listing.id);
-		store
-			.getState()
-			.select(listing.spaceIds.filter((id) => existingSpaceIds.has(id)));
+		const { history, levelId, showLevel, select } = store.getState();
+		const placed = listing.spaceIds.flatMap((id) => {
+			const space = history.draft.spaces[id];
+			return space ? [space] : [];
+		});
+		const there = placed.some((s) => s.levelId === levelId)
+			? levelId
+			: placed[0]?.levelId;
+		if (there && there !== levelId) showLevel(there);
+		select(placed.map((s) => s.id));
 	};
 
 	return (
@@ -567,7 +574,7 @@ function ListingEditor({
 
 const panel: CSSProperties = {
 	gridRow: 3,
-	gridColumn: 2,
+	gridColumn: 3,
 	overflow: "auto",
 	padding: "8px 12px",
 	background: "#fff",

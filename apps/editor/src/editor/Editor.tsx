@@ -8,14 +8,10 @@ import {
 	useState,
 } from "react";
 import { useStore } from "zustand";
-import {
-	api,
-	type Category,
-	type LevelDetails,
-	type MapDetails,
-} from "../api.ts";
+import { api, type Category, type MapDetails } from "../api.ts";
 import { deleteSelection, mergeSelection } from "./actions.ts";
 import { LevelCanvas } from "./LevelCanvas.tsx";
+import { LevelPanel } from "./LevelPanel.tsx";
 import { PublishPanel } from "./PublishPanel.tsx";
 import { SidePanel } from "./SidePanel.tsx";
 import { createEditorStore } from "./store.ts";
@@ -49,7 +45,6 @@ type EditorProps = {
 };
 
 export function Editor({ map, initial, onExit }: EditorProps) {
-	const level = map.levels[0] as LevelDetails;
 	const [saveStatus, setSaveStatus] = useState<SyncStatus>("saved");
 	const [{ store, sync }] = useState(() => {
 		const sync = createDraftSync({
@@ -63,7 +58,10 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		});
 		return { store, sync };
 	});
-	const { history, selection, error } = useStore(store);
+	const { history, selection, error, levelId } = useStore(store);
+	const level = history.draft.levels[levelId];
+	/** Which Levels have a floor plan, and at what scale; updated as plans are uploaded. */
+	const [underlayDetails, setUnderlayDetails] = useState(map.underlays);
 	const [toolName, setToolName] = useState<ToolName>("box");
 	const [underlay, setUnderlay] = useState<Underlay | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
@@ -96,13 +94,22 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		}
 	};
 
+	// Each Level has its own floor plan; load the shown one's when switching Level.
+	const underlayInfo = underlayDetails[levelId];
 	useEffect(() => {
-		if (level.underlay)
-			void loadUnderlay(
-				api.underlayUrl(level.id),
-				level.underlay.pixelsPerMetre,
-			).then(setUnderlay);
-	}, [level]);
+		setUnderlay(null);
+		if (!underlayInfo) return;
+		let current = true;
+		void loadUnderlay(
+			api.underlayUrl(map.id, levelId),
+			underlayInfo.pixelsPerMetre,
+		).then((loaded) => {
+			if (current) setUnderlay(loaded);
+		});
+		return () => {
+			current = false;
+		};
+	}, [map.id, levelId, underlayInfo]);
 
 	// Warn before leaving with edits that haven't reached the server.
 	useEffect(() => {
@@ -112,14 +119,20 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		return () => window.removeEventListener("beforeunload", warn);
 	}, [saveStatus]);
 
-	/** Uploads a floor plan for this Level (converted to PNG first) and shows it. */
+	/** Uploads a floor plan for the Level being shown (converted to PNG first) and shows it. */
 	const applyFloorPlan = async (file: Blob) => {
 		setNotice("Uploading floor plan…");
+		const forLevel = levelId;
 		try {
-			await api.uploadUnderlay(level.id, await toUploadablePng(file));
-			setUnderlay(
-				await loadUnderlay(`${api.underlayUrl(level.id)}?v=${Date.now()}`),
+			await api.uploadUnderlay(map.id, forLevel, await toUploadablePng(file));
+			const loaded = await loadUnderlay(
+				`${api.underlayUrl(map.id, forLevel)}?v=${Date.now()}`,
 			);
+			setUnderlayDetails((all) => ({
+				...all,
+				[forLevel]: { pixelsPerMetre: loaded.pixelsPerMetre },
+			}));
+			if (store.getState().levelId === forLevel) setUnderlay(loaded);
 			setNotice(null);
 		} catch (e) {
 			setNotice(
@@ -136,8 +149,8 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	const draft = history.draft;
 	// The Draft covers the whole Map; show the Level being edited.
 	const spaces = useMemo(
-		() => Object.values(draft.spaces).filter((s) => s.levelId === level.id),
-		[draft, level],
+		() => Object.values(draft.spaces).filter((s) => s.levelId === levelId),
+		[draft, levelId],
 	);
 	const listings = useMemo(() => Object.values(draft.listings), [draft]);
 	const existingSpaceIds = useMemo(
@@ -194,7 +207,7 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		store,
 		draft,
 		selection,
-		levelId: level.id,
+		levelId,
 		scale: viewport.view.scale,
 		tolerance: SNAP_PIXELS / viewport.view.scale,
 		grid: gridOn ? GRID_METRES : undefined,
@@ -252,6 +265,7 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 					←
 				</button>
 				<strong>{map.name}</strong>
+				{level && <span style={{ color: "#64748b" }}>{level.name}</span>}
 				<SaveIndicator status={saveStatus} />
 				<button
 					type="button"
@@ -372,6 +386,7 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 					· Scroll to zoom · hold Space and drag to pan · Ctrl+Z undo
 				</span>
 			</div>
+			<LevelPanel store={store} draft={draft} levelId={levelId} />
 			<div
 				ref={canvasArea}
 				style={{ overflow: "hidden", position: "relative" }}
@@ -419,7 +434,7 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 const layout: CSSProperties = {
 	display: "grid",
 	gridTemplateRows: "auto auto 1fr",
-	gridTemplateColumns: "1fr 320px",
+	gridTemplateColumns: "180px 1fr 320px",
 	height: "100%",
 	font: "13px system-ui, sans-serif",
 };
