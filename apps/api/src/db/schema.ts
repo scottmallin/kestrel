@@ -24,18 +24,19 @@ export const maps = pgTable("map", {
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const levels = pgTable("level", {
-	id: uuid("id").primaryKey().defaultRandom(),
-	mapId: uuid("map_id")
-		.notNull()
-		.references(() => maps.id, { onDelete: "cascade" }),
-	name: text("name").notNull(),
-	/** Order from the lowest Level up; 0 is the ground floor. */
-	ordinal: integer("ordinal").notNull(),
-	/** Storage key of the Underlay file, if one has been uploaded. */
-	underlayKey: text("underlay_key"),
-	underlayPixelsPerMetre: real("underlay_pixels_per_metre"),
-});
+/** A Level's floor plan. Levels live in the Draft (ADR 0007); this row is editor-only and never published. */
+export const underlays = pgTable(
+	"underlay",
+	{
+		mapId: uuid("map_id")
+			.notNull()
+			.references(() => maps.id, { onDelete: "cascade" }),
+		levelId: text("level_id").notNull(),
+		storageKey: text("storage_key").notNull(),
+		pixelsPerMetre: real("pixels_per_metre").notNull(),
+	},
+	(t) => [primaryKey({ columns: [t.mapId, t.levelId] })],
+);
 
 /** Every Operation applied to a Map's Draft, in order (ADR 0005). */
 export const draftOperations = pgTable(

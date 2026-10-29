@@ -21,7 +21,7 @@ ADR 0004 already expected that "new Draft contents (Levels, Listings, Amenities)
 - **A Space must be on a Level that exists** when it's added or replaced.
 - **Underlays (and, later, Alignment and scale) stay outside the Draft**, as rows keyed by Map and Level id. They are editor-only, never published (ADR 0003 amendment), and uploading a file is a side effect that undo can't reverse. Alignment and scale only change how an Underlay sits on the Building's plane, never the Spaces, so the Draft doesn't need them.
 - **One implicit Building in the alpha.** Levels carry no Building id yet; one arrives with multiple Buildings in the beta, with a default for older Operations.
-- **Existing Maps are migrated** by storing a snapshot at sequence number 0 holding each Map's existing Level (same id), and adding it to any snapshots already stored, so their logs replay unchanged. A new Map's log starts with an `addLevel` for its Ground floor.
+- **Existing Maps are migrated** by storing a snapshot at sequence number 0 holding each Map's existing Level (same id), and adding it to any snapshots already stored, so their logs replay unchanged. A new Map starts the same way: a snapshot at 0 holding its Ground floor, before any Operation.
 
 ## Consequences
 

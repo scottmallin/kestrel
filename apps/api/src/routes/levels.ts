@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { asc, desc, eq } from "drizzle-orm";
+import { LEVEL_ID } from "@kestrel/domain";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AppDeps } from "../app.ts";
-import { embeds, levels, publishedVersions } from "../db/schema.ts";
+import { embeds, publishedVersions, underlays } from "../db/schema.ts";
+import { loadDraft } from "../draft.ts";
 import { isImageUpload } from "../images.ts";
 import { DEFAULT_PIXELS_PER_METRE } from "../underlay.ts";
-import { findLevelForUser, findMapForUser } from "./access.ts";
+import { findMapForUser } from "./access.ts";
 import { requireUser } from "./session.ts";
+
+type LevelParams = { Params: { mapId: string; levelId: string } };
 
 export const levelRoutes =
 	({ db, auth, storage }: AppDeps) =>
@@ -18,12 +22,8 @@ export const levelRoutes =
 				if (!user) return;
 				const map = await findMapForUser(db, request.params.mapId, user.userId);
 				if (!map) return reply.status(404).send({ error: "No such Map." });
-				const [rows, embedRows, [latest]] = await Promise.all([
-					db
-						.select()
-						.from(levels)
-						.where(eq(levels.mapId, map.id))
-						.orderBy(asc(levels.ordinal)),
+				const [underlayRows, embedRows, [latest]] = await Promise.all([
+					db.select().from(underlays).where(eq(underlays.mapId, map.id)),
 					db
 						.select({ id: embeds.id, name: embeds.name })
 						.from(embeds)
@@ -42,17 +42,13 @@ export const levelRoutes =
 				return {
 					id: map.id,
 					name: map.name,
-					levels: rows.map((l) => ({
-						id: l.id,
-						name: l.name,
-						ordinal: l.ordinal,
-						underlay: l.underlayKey
-							? {
-									pixelsPerMetre:
-										l.underlayPixelsPerMetre ?? DEFAULT_PIXELS_PER_METRE,
-								}
-							: null,
-					})),
+					// The Levels themselves are in the Draft (ADR 0007).
+					underlays: Object.fromEntries(
+						underlayRows.map((u) => [
+							u.levelId,
+							{ pixelsPerMetre: u.pixelsPerMetre },
+						]),
+					),
 					published: latest
 						? {
 								version: latest.version,
@@ -64,49 +60,59 @@ export const levelRoutes =
 			},
 		);
 
-		app.put<{ Params: { levelId: string } }>(
-			"/api/levels/:levelId/underlay",
+		app.put<LevelParams>(
+			"/api/maps/:mapId/levels/:levelId/underlay",
 			async (request, reply) => {
 				const user = await requireUser(auth, request, reply);
 				if (!user) return;
-				const found = await findLevelForUser(
-					db,
-					request.params.levelId,
-					user.userId,
-				);
-				if (!found) return reply.status(404).send({ error: "No such Level." });
+				const { levelId } = request.params;
+				const map = await findMapForUser(db, request.params.mapId, user.userId);
+				if (!map || !LEVEL_ID.test(levelId))
+					return reply.status(404).send({ error: "No such Level." });
+				const { draft } = await loadDraft(db, map.id);
+				if (!draft.levels[levelId])
+					return reply.status(404).send({ error: "No such Level." });
 				const contentType = request.headers["content-type"] ?? "";
 				if (!isImageUpload(contentType, request.body)) {
 					return reply.status(415).send({
 						error: "Upload the floor plan as a PNG, JPEG or WebP image.",
 					});
 				}
-				const key = `organisations/${found.organizationId}/levels/${found.level.id}/underlay-${randomUUID()}`;
-				await storage.put(key, { bytes: request.body, contentType });
+				const storageKey = `organisations/${map.organizationId}/maps/${map.id}/levels/${levelId}/underlay-${randomUUID()}`;
+				await storage.put(storageKey, { bytes: request.body, contentType });
+				const values = {
+					storageKey,
+					pixelsPerMetre: DEFAULT_PIXELS_PER_METRE,
+				};
 				await db
-					.update(levels)
-					.set({
-						underlayKey: key,
-						underlayPixelsPerMetre: DEFAULT_PIXELS_PER_METRE,
-					})
-					.where(eq(levels.id, found.level.id));
+					.insert(underlays)
+					.values({ mapId: map.id, levelId, ...values })
+					.onConflictDoUpdate({
+						target: [underlays.mapId, underlays.levelId],
+						set: values,
+					});
 				return reply.status(204).send();
 			},
 		);
 
-		app.get<{ Params: { levelId: string } }>(
-			"/api/levels/:levelId/underlay",
+		app.get<LevelParams>(
+			"/api/maps/:mapId/levels/:levelId/underlay",
 			async (request, reply) => {
 				const user = await requireUser(auth, request, reply);
 				if (!user) return;
-				const found = await findLevelForUser(
-					db,
-					request.params.levelId,
-					user.userId,
-				);
-				const file = found?.level.underlayKey
-					? await storage.get(found.level.underlayKey)
-					: null;
+				const map = await findMapForUser(db, request.params.mapId, user.userId);
+				const [row] = map
+					? await db
+							.select()
+							.from(underlays)
+							.where(
+								and(
+									eq(underlays.mapId, map.id),
+									eq(underlays.levelId, request.params.levelId),
+								),
+							)
+					: [];
+				const file = row ? await storage.get(row.storageKey) : null;
 				if (!file)
 					return reply
 						.status(404)

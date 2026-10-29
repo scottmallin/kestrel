@@ -166,10 +166,19 @@ function ordinal(value: unknown, what: string): number {
 	return value as number;
 }
 
+/** Level ids end up in storage keys (Underlays), so only plain characters are allowed. */
+export const LEVEL_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+function levelId(value: unknown, what: string): string {
+	if (typeof value !== "string" || !LEVEL_ID.test(value))
+		fail(`${what} must be 1–64 letters, digits, hyphens or underscores`);
+	return value;
+}
+
 function level(value: unknown): Level {
 	const l = record(value, "level");
 	return {
-		id: string(l.id, "level.id"),
+		id: levelId(l.id, "level.id"),
 		name: levelName(l.name, "level.name"),
 		ordinal: ordinal(l.ordinal, "level.ordinal"),
 	};
