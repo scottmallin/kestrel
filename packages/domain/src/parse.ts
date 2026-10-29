@@ -1,6 +1,7 @@
 import type { Point } from "@kestrel/geometry";
 import type { ListingChanges, Operation, SpaceChanges } from "./draft.ts";
 import {
+	type Level,
 	type Listing,
 	SPACE_KINDS,
 	type Space,
@@ -143,6 +144,45 @@ function changes(value: unknown): SpaceChanges {
 	};
 }
 
+/** Longest Level name accepted, and the furthest a Level may be from the ground floor. */
+const LEVEL_NAME_LIMIT = 60;
+const LEVEL_ORDINAL_LIMIT = 200;
+
+function levelName(value: unknown, what: string): string {
+	if (typeof value !== "string") fail(`${what} must be text`);
+	if (value.length > LEVEL_NAME_LIMIT)
+		fail(`${what} must be at most ${LEVEL_NAME_LIMIT} characters`);
+	return value;
+}
+
+function ordinal(value: unknown, what: string): number {
+	if (
+		!Number.isInteger(value) ||
+		Math.abs(value as number) > LEVEL_ORDINAL_LIMIT
+	)
+		fail(
+			`${what} must be a whole number between -${LEVEL_ORDINAL_LIMIT} and ${LEVEL_ORDINAL_LIMIT}`,
+		);
+	return value as number;
+}
+
+function level(value: unknown): Level {
+	const l = record(value, "level");
+	return {
+		id: string(l.id, "level.id"),
+		name: levelName(l.name, "level.name"),
+		ordinal: ordinal(l.ordinal, "level.ordinal"),
+	};
+}
+
+function ordinals(value: unknown): Record<string, number> {
+	const o = record(value, "ordinals");
+	const result: Record<string, number> = {};
+	for (const [id, n] of Object.entries(o))
+		result[id] = ordinal(n, `ordinals.${id}`);
+	return result;
+}
+
 function operation(input: unknown): Operation {
 	const o = record(input, "Operation");
 	switch (o.type) {
@@ -180,6 +220,32 @@ function operation(input: unknown): Operation {
 			};
 		case "removeListing":
 			return { type: "removeListing", id: string(o.id, "id") };
+		case "addLevel":
+			return {
+				type: "addLevel",
+				level: level(o.level),
+				...(o.spaces !== undefined && {
+					spaces: Array.isArray(o.spaces)
+						? o.spaces.map((s, i) => space(s, `spaces[${i}]`))
+						: fail("spaces must be a list"),
+				}),
+			};
+		case "updateLevel": {
+			const c = record(o.changes, "changes");
+			return {
+				type: "updateLevel",
+				id: string(o.id, "id"),
+				changes: {
+					...(c.name !== undefined && {
+						name: levelName(c.name, "changes.name"),
+					}),
+				},
+			};
+		}
+		case "reorderLevels":
+			return { type: "reorderLevels", ordinals: ordinals(o.ordinals) };
+		case "removeLevel":
+			return { type: "removeLevel", id: string(o.id, "id") };
 		default:
 			return fail(`Unknown Operation type ${JSON.stringify(o.type)}`);
 	}

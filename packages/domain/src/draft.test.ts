@@ -7,6 +7,12 @@ import {
 } from "./draft.ts";
 import type { Space } from "./index.ts";
 
+/** A Draft with just a ground floor, "l1", for Spaces to go on. */
+const groundOnly = (): Draft => ({
+	...emptyDraft(),
+	levels: { l1: { id: "l1", name: "Ground floor", ordinal: 0 } },
+});
+
 const unit1: Space = {
 	id: "s1",
 	levelId: "l1",
@@ -28,7 +34,7 @@ function applyOk(draft: Draft, operation: Operation) {
 
 describe("addSpace", () => {
 	it("adds the Space to the Draft", () => {
-		const { draft } = applyOk(emptyDraft(), { type: "addSpace", space: unit1 });
+		const { draft } = applyOk(groundOnly(), { type: "addSpace", space: unit1 });
 		expect(draft.spaces).toEqual({ s1: unit1 });
 	});
 });
@@ -45,7 +51,7 @@ describe("inverse", () => {
 	});
 
 	it("of addSpace restores the original Draft", () => {
-		const original = applyOk(emptyDraft(), {
+		const original = applyOk(groundOnly(), {
 			type: "addSpace",
 			space: unit2(),
 		}).draft;
@@ -65,8 +71,8 @@ function unit2(): Space {
 
 function draftWith(...spaces: Space[]): Draft {
 	return {
+		...groundOnly(),
 		spaces: Object.fromEntries(spaces.map((s) => [s.id, s])),
-		listings: {},
 	};
 }
 
@@ -99,7 +105,7 @@ function rect(x0: number, y0: number, x1: number, y1: number) {
 describe("rejects", () => {
 	it("a Space outline with fewer than 3 corners", () => {
 		const line = { ...unit1, outline: unit1.outline.slice(0, 2) };
-		const result = applyOperation(emptyDraft(), {
+		const result = applyOperation(groundOnly(), {
 			type: "addSpace",
 			space: line,
 		});
