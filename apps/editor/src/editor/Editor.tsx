@@ -156,6 +156,8 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	const [opacity, setOpacity] = useState(0.6);
 	const [gridOn, setGridOn] = useState(false);
 	const [size, setSize] = useState({ width: 800, height: 600 });
+	/** Whether size is the canvas's real size yet. */
+	const [measured, setMeasured] = useState(false);
 	const canvasArea = useRef<HTMLDivElement>(null);
 	const viewport = useViewport(size.width, size.height);
 
@@ -196,20 +198,25 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		const el = canvasArea.current;
 		if (!el) return;
 		const observer = new ResizeObserver(([entry]) => {
-			if (entry)
-				setSize({
-					width: entry.contentRect.width,
-					height: entry.contentRect.height,
-				});
+			if (!entry) return;
+			setSize({
+				width: entry.contentRect.width,
+				height: entry.contentRect.height,
+			});
+			setMeasured(true);
 		});
 		observer.observe(el);
 		return () => observer.disconnect();
 	}, []);
 
 	const { fit } = viewport;
-	// Fit the plan whenever it's shown, rescaled or moved.
+	// Fit the plan whenever it's shown, rescaled or moved, but not when the canvas merely changes size (a
+	// tool's options can wrap the toolbar), so choosing a tool never throws away your zoom.
+	const fitted = useRef<Underlay | null>(null);
 	useEffect(() => {
-		if (!underlay) return;
+		// Wait for the canvas's real size, or the first fit would use the placeholder one.
+		if (!underlay || !measured || fitted.current === underlay) return;
+		fitted.current = underlay;
 		const { image, placement } = underlay;
 		const corners = [
 			{ x: 0, y: 0 },
@@ -225,7 +232,7 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 			maxX: Math.max(...xs),
 			maxY: Math.max(...ys),
 		});
-	}, [underlay, fit]);
+	}, [underlay, fit, measured]);
 
 	const ctx: ToolContext = {
 		store,

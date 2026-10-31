@@ -74,7 +74,7 @@ pnpm --filter @kestrel/embed dev         # Embed at http://localhost:5174 (open 
 pnpm check       # Biome lint + format (run `pnpm format` twice if imports were reordered)
 pnpm typecheck
 pnpm test        # Vitest unit tests (148)
-pnpm e2e         # Playwright browser tests (22) in the installed Microsoft Edge; starts its own API, editor and a production build of the Embed
+pnpm e2e         # Playwright browser tests (23) in the installed Microsoft Edge; starts its own API, editor and a production build of the Embed
 ```
 
 ## How we work
