@@ -1,8 +1,11 @@
+import type { Placement } from "@kestrel/geometry";
 import type { Level, Listing, Space, SpaceKind } from "./index.ts";
 
 /** The editable working copy of a Map: its Levels, Spaces and Listings, by id. */
 export type Draft = {
 	readonly levels: Readonly<Record<string, Level>>;
+	/** Where each Level's Underlay sits on the plane, by Level id (ADR 0008). */
+	readonly placements: Readonly<Record<string, Placement>>;
 	readonly spaces: Readonly<Record<string, Space>>;
 	readonly listings: Readonly<Record<string, Listing>>;
 };
@@ -37,6 +40,8 @@ export type Operation =
 			readonly level: Level;
 			/** Spaces on the new Level, used when undoing its removal. */
 			readonly spaces?: readonly Space[];
+			/** Its Underlay's Placement, used when undoing its removal. */
+			readonly placement?: Placement;
 	  }
 	| {
 			readonly type: "updateLevel";
@@ -48,7 +53,19 @@ export type Operation =
 			/** New ordinals by Level id; Levels not listed keep theirs. */
 			readonly ordinals: Readonly<Record<string, number>>;
 	  }
-	| { readonly type: "removeLevel"; readonly id: string };
+	| { readonly type: "removeLevel"; readonly id: string }
+	| {
+			readonly type: "placeUnderlay";
+			readonly levelId: string;
+			/** null clears it, so the Underlay shows at the default Placement. */
+			readonly placement: Placement | null;
+	  }
+	| {
+			/** The result of scaling the whole plane (ADR 0008): Spaces and Placements as they end up. */
+			readonly type: "rescaleBuilding";
+			readonly spaces: readonly Space[];
+			readonly placements: Readonly<Record<string, Placement>>;
+	  };
 
 export type LevelChanges = { readonly name?: string };
 
@@ -80,6 +97,7 @@ export type ApplyResult =
 
 export const emptyDraft = (): Draft => ({
 	levels: {},
+	placements: {},
 	spaces: {},
 	listings: {},
 });
@@ -224,9 +242,21 @@ export function applyOperation(
 				};
 			const added = replace({ ...draft, levels }, [], spaces);
 			if (!added.ok) return added;
+			if (operation.placement) {
+				const invalid = checkPlacement(operation.placement);
+				if (invalid) return invalid;
+			}
 			return {
 				ok: true,
-				draft: added.draft,
+				draft: operation.placement
+					? {
+							...added.draft,
+							placements: {
+								...added.draft.placements,
+								[level.id]: operation.placement,
+							},
+						}
+					: added.draft,
 				inverse: { type: "removeLevel", id: level.id },
 			};
 		}
@@ -280,17 +310,94 @@ export function applyOperation(
 			);
 			const spaces = { ...draft.spaces };
 			for (const space of onLevel) delete spaces[space.id];
+			const { [level.id]: placement, ...placements } = draft.placements;
 			return {
 				ok: true,
-				draft: { ...draft, levels, spaces },
+				draft: { ...draft, levels, spaces, placements },
 				inverse: {
 					type: "addLevel",
 					level,
 					...(onLevel.length > 0 && { spaces: onLevel }),
+					...(placement && { placement }),
+				},
+			};
+		}
+		case "placeUnderlay": {
+			const { levelId, placement } = operation;
+			if (!draft.levels[levelId])
+				return { ok: false, error: `No Level with id ${levelId}` };
+			if (placement) {
+				const invalid = checkPlacement(placement);
+				if (invalid) return invalid;
+			}
+			const { [levelId]: previous, ...others } = draft.placements;
+			return {
+				ok: true,
+				draft: {
+					...draft,
+					placements: placement ? { ...others, [levelId]: placement } : others,
+				},
+				inverse: {
+					type: "placeUnderlay",
+					levelId,
+					placement: previous ?? null,
+				},
+			};
+		}
+		case "rescaleBuilding": {
+			const spaces = { ...draft.spaces };
+			const previousSpaces: Space[] = [];
+			for (const space of operation.spaces) {
+				const existing = draft.spaces[space.id];
+				if (!existing)
+					return { ok: false, error: `No Space with id ${space.id}` };
+				if (existing.levelId !== space.levelId)
+					return {
+						ok: false,
+						error: `Space ${space.id} can't change Level while rescaling`,
+					};
+				if (space.outline.length < 3)
+					return {
+						ok: false,
+						error: `Space ${space.id} needs at least 3 corners`,
+					};
+				previousSpaces.push(existing);
+				spaces[space.id] = space;
+			}
+			const placements = { ...draft.placements };
+			const previousPlacements: Record<string, Placement> = {};
+			for (const [levelId, placement] of Object.entries(operation.placements)) {
+				if (!draft.levels[levelId])
+					return { ok: false, error: `No Level with id ${levelId}` };
+				const invalid = checkPlacement(placement);
+				if (invalid) return invalid;
+				const previous = draft.placements[levelId];
+				// A rescale only scales Placements that exist; one appearing has no previous value to restore.
+				if (!previous)
+					return {
+						ok: false,
+						error: `Level ${levelId} has no Placement to rescale`,
+					};
+				previousPlacements[levelId] = previous;
+				placements[levelId] = placement;
+			}
+			return {
+				ok: true,
+				draft: { ...draft, spaces, placements },
+				inverse: {
+					type: "rescaleBuilding",
+					spaces: previousSpaces,
+					placements: previousPlacements,
 				},
 			};
 		}
 	}
+}
+
+function checkPlacement(placement: Placement): ApplyResult | undefined {
+	if (!(placement.scale > 0))
+		return { ok: false, error: "A Placement's scale must be above 0" };
+	return undefined;
 }
 
 /** Checks the given Levels have a name and a whole-number ordinal no other Level has. */
