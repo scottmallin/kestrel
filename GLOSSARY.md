@@ -25,7 +25,7 @@ A structure within a Map, containing one or more Levels.
 _Avoid_: Block, structure
 
 **Level**:
-One floor of a Building, on which Spaces are drawn.
+One floor of a Building, on which Spaces are drawn. Its ordinal is its floor number: 0 for the ground floor, negative for basements.
 _Avoid_: Floor, storey, story
 
 **Outdoor Area**:

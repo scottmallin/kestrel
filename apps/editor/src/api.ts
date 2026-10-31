@@ -2,16 +2,13 @@ import type { Draft, Operation } from "@kestrel/domain";
 import type { SaveResult } from "./editor/sync.ts";
 
 export type MapSummary = { id: string; name: string };
-export type LevelDetails = {
-	id: string;
-	name: string;
-	ordinal: number;
-	underlay: { pixelsPerMetre: number } | null;
-};
+/** A Level's floor plan; the Levels themselves are in the Draft (ADR 0007). */
+export type UnderlayDetails = { pixelsPerMetre: number };
 export type MapDetails = {
 	id: string;
 	name: string;
-	levels: LevelDetails[];
+	/** By Level id, for Levels that have a floor plan. */
+	underlays: Record<string, UnderlayDetails>;
 	/** The latest Published Version, if the Map has been published. */
 	published: { version: number; publishedAt: string } | null;
 	embeds: { id: string; name: string }[];
@@ -126,8 +123,8 @@ export const api = {
 			method: "POST",
 		}),
 
-	uploadUnderlay: (levelId: string, png: Blob) =>
-		call<null>(`/api/levels/${levelId}/underlay`, {
+	uploadUnderlay: (mapId: string, levelId: string, png: Blob) =>
+		call<null>(`/api/maps/${mapId}/levels/${levelId}/underlay`, {
 			method: "PUT",
 			body: png,
 			headers: { "content-type": "image/png" },
@@ -144,5 +141,6 @@ export const api = {
 		}),
 	logoUrl: (logoKey: string) => `/api/public/${logoKey}`,
 
-	underlayUrl: (levelId: string) => `/api/levels/${levelId}/underlay`,
+	underlayUrl: (mapId: string, levelId: string) =>
+		`/api/maps/${mapId}/levels/${levelId}/underlay`,
 };

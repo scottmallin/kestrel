@@ -7,6 +7,12 @@ import {
 } from "./draft.ts";
 import type { Listing, Space } from "./index.ts";
 
+/** A Draft with just a ground floor, "l1", for Spaces to go on. */
+const groundOnly = (): Draft => ({
+	...emptyDraft(),
+	levels: { l1: { id: "l1", name: "Ground floor", ordinal: 0 } },
+});
+
 const unit: Space = {
 	id: "s1",
 	levelId: "l1",
@@ -31,7 +37,7 @@ function applyOk(draft: Draft, operation: Operation) {
 }
 
 const withUnit = () =>
-	applyOk(emptyDraft(), { type: "addSpace", space: unit }).draft;
+	applyOk(groundOnly(), { type: "addSpace", space: unit }).draft;
 
 describe("addListing", () => {
 	it("adds a Listing, and its inverse removes it again", () => {

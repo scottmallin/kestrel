@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import { draftSnapshots } from "./db/schema.ts";
 import { testApp } from "./test/harness.ts";
 
+/** The new Map's ground floor, set by newMap(). */
+let levelId = "";
+
 const box = (id: string, x: number): Space => ({
 	id,
-	levelId: "level-1",
+	levelId,
 	kind: "unit",
 	outline: [
 		{ x, y: 0 },
@@ -20,7 +23,10 @@ async function newMap() {
 	const owner = await harness.signUp("Trafford");
 	const map = (
 		await owner.request("POST", "/api/maps", { name: "Main mall" })
-	).json<{ id: string }>();
+	).json<{ id: string; levels: { id: string }[] }>();
+	levelId = map.levels[0]?.id ?? "";
+	const ground = { id: levelId, name: "Ground floor", ordinal: 0 };
+	const levels = { [levelId]: ground };
 	const save = (baseSeq: number, operations: Operation[]) =>
 		owner.request("POST", `/api/maps/${map.id}/operations`, {
 			baseSeq,
@@ -28,20 +34,20 @@ async function newMap() {
 		});
 	const load = async () =>
 		(await owner.request("GET", `/api/maps/${map.id}/draft`)).json();
-	return { ...harness, owner, map, save, load };
+	return { ...harness, owner, map, save, load, levels };
 }
 
 describe("Draft", () => {
-	it("starts empty", async () => {
-		const { load } = await newMap();
+	it("starts with just a ground floor", async () => {
+		const { load, levels } = await newMap();
 		expect(await load()).toEqual({
 			seq: 0,
-			draft: { spaces: {}, listings: {} },
+			draft: { levels, spaces: {}, listings: {} },
 		});
 	});
 
 	it("saves Operations and loads them back", async () => {
-		const { save, load } = await newMap();
+		const { save, load, levels } = await newMap();
 
 		const saved = await save(0, [
 			{ type: "addSpace", space: box("a", 0) },
@@ -52,7 +58,11 @@ describe("Draft", () => {
 
 		expect(await load()).toEqual({
 			seq: 2,
-			draft: { spaces: { a: box("a", 0), b: box("b", 10) }, listings: {} },
+			draft: {
+				levels,
+				spaces: { a: box("a", 0), b: box("b", 10) },
+				listings: {},
+			},
 		});
 	});
 
@@ -68,7 +78,7 @@ describe("Draft", () => {
 	});
 
 	it("rejects Operations that don't apply, saving none of the batch", async () => {
-		const { save, load } = await newMap();
+		const { save, load, levels } = await newMap();
 
 		const invalid = await save(0, [
 			{ type: "addSpace", space: box("a", 0) },
@@ -81,12 +91,12 @@ describe("Draft", () => {
 		});
 		expect(await load()).toEqual({
 			seq: 0,
-			draft: { spaces: {}, listings: {} },
+			draft: { levels, spaces: {}, listings: {} },
 		});
 	});
 
 	it("refuses malformed requests without touching the Draft", async () => {
-		const { owner, map, load } = await newMap();
+		const { owner, map, load, levels } = await newMap();
 		const post = (payload: object) =>
 			owner.request("POST", `/api/maps/${map.id}/operations`, payload);
 
@@ -111,7 +121,7 @@ describe("Draft", () => {
 		}
 		expect(await load()).toEqual({
 			seq: 0,
-			draft: { spaces: {}, listings: {} },
+			draft: { levels, spaces: {}, listings: {} },
 		});
 	});
 

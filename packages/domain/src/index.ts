@@ -25,10 +25,11 @@ export type Space = {
 	readonly outline: Polygon;
 };
 
+/** One floor of the Map's (single, for now) Building; ADR 0007. */
 export type Level = {
 	readonly id: string;
-	readonly buildingId: string;
 	readonly name: string;
+	/** The floor number: 0 is the ground floor, basements are negative. Unique within a Map. */
 	readonly ordinal: number;
 };
 

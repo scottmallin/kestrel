@@ -51,6 +51,7 @@ export type PublishedBundle = {
 	map: { id: string; name: string };
 	version: number;
 	publishedAt: string;
+	/** Lowest floor first; 0 is the ground floor. */
 	levels: { id: string; name: string; ordinal: number }[];
 	spaces: { type: "FeatureCollection"; features: SpaceFeature[] };
 	/** Placed Listings only; Unplaced Listings are never published. */
@@ -65,7 +66,6 @@ export type PublishedBundle = {
 
 export type CompileInput = {
 	map: { id: string; name: string };
-	levels: readonly { id: string; name: string; ordinal: number }[];
 	/** The Organisation's Categories; Listings pointing at any other id count as uncategorised. */
 	categories: readonly { id: string; name: string }[];
 	/** Public URL for a logo's storage key. */
@@ -94,7 +94,11 @@ const byId = <T extends { id: string }>(a: T, b: T) =>
 
 /** Compiles a Draft into the bundle an Embed loads. Pure: the same input always gives the same bundle. */
 export function compileBundle(input: CompileInput): PublishedBundle {
-	const { map, levels, draft, version, publishedAt } = input;
+	const { map, draft, version, publishedAt } = input;
+	// Lowest floor first (ADR 0007).
+	const levels = Object.values(draft.levels)
+		.map(({ id, name, ordinal }) => ({ id, name, ordinal }))
+		.sort((a, b) => a.ordinal - b.ordinal);
 	// Sorted by id, so the bundle doesn't depend on the order things were drawn in.
 	const spaces = Object.values(draft.spaces).sort(byId);
 	const categories = new Map(input.categories.map((c) => [c.id, c.name]));
@@ -137,7 +141,7 @@ export function compileBundle(input: CompileInput): PublishedBundle {
 		map: { id: map.id, name: map.name },
 		version,
 		publishedAt,
-		levels: [...levels],
+		levels,
 		spaces: { type: "FeatureCollection", features },
 		listings,
 		categories: usedCategories,

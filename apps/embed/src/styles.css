@@ -32,9 +32,52 @@ body {
 		grid-template-columns: 1fr 300px;
 	}
 }
-.map {
-	background: var(--canvas);
+.map-area {
+	position: relative;
 	min-height: 0;
+}
+.map {
+	position: absolute;
+	inset: 0;
+	background: var(--canvas);
+}
+/* The Level switcher: floors stacked highest first, like a lift panel. */
+.levels {
+	position: absolute;
+	top: 12px;
+	left: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px;
+	max-height: calc(100% - 24px);
+	overflow-y: auto;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	box-shadow: 0 1px 3px rgb(15 23 42 / 0.12);
+}
+.levels button {
+	/* At least 44px tall: an easy target on phones (WCAG 2.5.8 asks for 24). */
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0 12px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+.levels button[aria-pressed="true"] {
+	background: var(--accent);
+	color: #fff;
+	font-weight: 600;
+}
+.levels button:focus-visible {
+	outline: 3px solid var(--accent);
+	outline-offset: 2px;
 }
 .directory {
 	display: flex;

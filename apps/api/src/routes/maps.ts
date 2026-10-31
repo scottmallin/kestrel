@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
+import { type Draft, emptyDraft, type Level } from "@kestrel/domain";
 import { asc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { AppDeps } from "../app.ts";
-import { levels, maps } from "../db/schema.ts";
+import { draftSnapshots, maps } from "../db/schema.ts";
 import { requireUser } from "./session.ts";
 
 export const mapRoutes =
@@ -41,15 +43,20 @@ export const mapRoutes =
 						.values({ organizationId, name })
 						.returning();
 					if (!map) throw new Error("Map insert returned nothing");
-					const created = await tx
-						.insert(levels)
-						.values({ mapId: map.id, name: "Ground floor", ordinal: 0 })
-						.returning({
-							id: levels.id,
-							name: levels.name,
-							ordinal: levels.ordinal,
-						});
-					return { id: map.id, name: map.name, levels: created };
+					// The Draft starts with a ground floor, as a snapshot before the first Operation (ADR 0007).
+					const ground: Level = {
+						id: randomUUID(),
+						name: "Ground floor",
+						ordinal: 0,
+					};
+					const draft: Draft = {
+						...emptyDraft(),
+						levels: { [ground.id]: ground },
+					};
+					await tx
+						.insert(draftSnapshots)
+						.values({ mapId: map.id, seq: 0, draft });
+					return { id: map.id, name: map.name, levels: [ground] };
 				});
 				return reply.status(201).send(created);
 			},

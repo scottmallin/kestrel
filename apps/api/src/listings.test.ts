@@ -116,7 +116,11 @@ describe("Logos", () => {
 	it("never serves anything but logos, such as a private floor plan", async () => {
 		const { owner, map, app } = await setUp();
 		const levelId = map.levels[0].id;
-		await owner.upload(`/api/levels/${levelId}/underlay`, png, "image/png");
+		await owner.upload(
+			`/api/maps/${map.id}/levels/${levelId}/underlay`,
+			png,
+			"image/png",
+		);
 
 		for (const url of [
 			`/api/public/logos/../organisations/${owner.organisationId}/levels/${levelId}/underlay`,

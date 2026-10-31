@@ -31,6 +31,17 @@ const results = element<HTMLUListElement>("results");
 const count = element<HTMLParagraphElement>("results-count");
 const heading = element<HTMLHeadingElement>("directory-heading");
 const details = element<HTMLElement>("details");
+const levelSwitcher = element<HTMLElement>("levels");
+
+type PublishedLevel = PublishedBundle["levels"][number];
+
+/** The Level to open on: the ground floor, or the floor closest to it. */
+function startingLevel(levels: readonly PublishedLevel[]) {
+	return [...levels].sort(
+		(a, b) =>
+			Math.abs(a.ordinal) - Math.abs(b.ordinal) || a.ordinal - b.ordinal,
+	)[0];
+}
 
 function showProblem(message: string) {
 	document.body.innerHTML = "";
@@ -105,6 +116,14 @@ function show(bundle: PublishedBundle) {
 	const listings = new Map(bundle.listings.map((l) => [l.id, l]));
 	const categoryNames = new Map(bundle.categories.map((c) => [c.id, c.name]));
 	let selected: DirectoryEntry | null = null;
+	const levelNames = new Map(bundle.levels.map((l) => [l.id, l.name]));
+	const severalLevels = bundle.levels.length > 1;
+	let levelId = startingLevel(bundle.levels)?.id ?? "";
+	const onShownLevel: ExpressionSpecification = [
+		"==",
+		["get", "levelId"],
+		levelId,
+	];
 
 	// Un-pinned Buildings are drawn on a plain background (ADR 0003).
 	const map = new MapLibreMap({
@@ -124,12 +143,14 @@ function show(bundle: PublishedBundle) {
 					id: "space-fill",
 					type: "fill",
 					source: "spaces",
+					filter: onShownLevel,
 					paint: { "fill-color": FILL_COLOUR },
 				},
 				{
 					id: "space-outline",
 					type: "line",
 					source: "spaces",
+					filter: onShownLevel,
 					paint: { "line-color": "#64748b", "line-width": 1 },
 				},
 			],
@@ -144,12 +165,57 @@ function show(bundle: PublishedBundle) {
 	map.getCanvas().setAttribute("tabindex", "-1");
 
 	// Labels as HTML, so no font server is needed and they're real text.
+	const labels: { levelId: string; element: HTMLElement }[] = [];
 	for (const feature of bundle.spaces.features) {
 		if (!feature.properties.label) continue;
-		new Marker({ element: el("div", feature.properties.label, "label") })
-			.setLngLat(centreOf([feature]))
-			.addTo(map);
+		const element = el("div", feature.properties.label, "label");
+		element.hidden = feature.properties.levelId !== levelId;
+		labels.push({ levelId: feature.properties.levelId, element });
+		new Marker({ element }).setLngLat(centreOf([feature])).addTo(map);
 	}
+
+	/** Shows one Level's Spaces and labels; every Level shares the Building's plane, so the view stays put. */
+	const showLevel = (id: string) => {
+		if (id === levelId || !levelNames.has(id)) return;
+		levelId = id;
+		const filter: ExpressionSpecification = ["==", ["get", "levelId"], id];
+		map.setFilter("space-fill", filter);
+		map.setFilter("space-outline", filter);
+		for (const label of labels) label.element.hidden = label.levelId !== id;
+		for (const button of levelSwitcher.querySelectorAll("button"))
+			button.setAttribute(
+				"aria-pressed",
+				String(button.dataset.levelId === id),
+			);
+	};
+
+	if (severalLevels) {
+		const highestFirst = [...bundle.levels].sort(
+			(a, b) => b.ordinal - a.ordinal,
+		);
+		levelSwitcher.replaceChildren(
+			...highestFirst.map((level) => {
+				const button = el("button", level.name);
+				button.type = "button";
+				button.dataset.levelId = level.id;
+				button.setAttribute("aria-pressed", String(level.id === levelId));
+				button.addEventListener("click", () => showLevel(level.id));
+				return button;
+			}),
+		);
+		levelSwitcher.hidden = false;
+	}
+
+	/** The Levels a directory entry is on, in floor order. */
+	const levelsOf = (entry: DirectoryEntry) => {
+		const ids = new Set(
+			entry.spaceIds.flatMap((id) => {
+				const feature = features.get(id);
+				return feature ? [feature.properties.levelId] : [];
+			}),
+		);
+		return bundle.levels.filter((l) => ids.has(l.id));
+	};
 
 	const showDetails = (entry: DirectoryEntry) => {
 		const listing = listings.get(entry.id);
@@ -168,9 +234,16 @@ function show(bundle: PublishedBundle) {
 		selected = entry;
 		for (const id of entry.spaceIds)
 			map.setFeatureState({ source: "spaces", id }, { selected: true });
+		// Go to the place's floor, unless part of it is on the one already shown.
+		const onLevels = levelsOf(entry);
+		if (onLevels.length > 0 && !onLevels.some((l) => l.id === levelId))
+			showLevel((onLevels[0] as PublishedLevel).id);
 		const chosen = entry.spaceIds
 			.map((id) => features.get(id))
-			.filter((f): f is SpaceFeature => f !== undefined);
+			.filter(
+				(f): f is SpaceFeature =>
+					f !== undefined && f.properties.levelId === levelId,
+			);
 		// Keep the surroundings in view: centre the place, zooming in only if it would be tiny on screen.
 		if (chosen.length > 0) {
 			const camera = map.cameraForBounds(boundsOf(chosen), { padding: 80 });
@@ -213,7 +286,14 @@ function show(bundle: PublishedBundle) {
 					name.append(img);
 				}
 				name.append(entry.label);
-				button.append(name, el("span", entry.detail, "kind"));
+				// With several Levels, say which floor a place is on (the directory is the accessible route).
+				const where = severalLevels
+					? levelsOf(entry)
+							.map((l) => l.name)
+							.join(", ")
+					: "";
+				const detail = [entry.detail, where].filter(Boolean).join(" · ");
+				button.append(name, el("span", detail, "kind"));
 				button.addEventListener("click", () => select(entry));
 				const item = el("li");
 				item.append(button);

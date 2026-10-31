@@ -17,6 +17,7 @@ const unit = (id: string, x: number, reference?: string): Space => ({
 });
 const draftOf = (...spaces: Space[]): Draft => withListings(spaces);
 const withListings = (spaces: Space[], ...listings: Listing[]): Draft => ({
+	levels: { L0: level },
 	spaces: Object.fromEntries(spaces.map((s) => [s.id, s])),
 	listings: Object.fromEntries(listings.map((l) => [l.id, l])),
 });
@@ -24,7 +25,6 @@ const withListings = (spaces: Space[], ...listings: Listing[]): Draft => ({
 const compile = (draft: Draft) =>
 	compileBundle({
 		map: { id: "M1", name: "Main mall" },
-		levels: [level],
 		categories: [{ id: "health", name: "Health & beauty" }],
 		logoUrl: (key) => `https://cdn.example/${key}`,
 		draft,
@@ -36,6 +36,18 @@ const compile = (draft: Draft) =>
 const deg = (metres: number) => metres / METRES_PER_DEGREE;
 
 describe("compileBundle", () => {
+	it("publishes the Draft's Levels lowest floor first", () => {
+		const draft: Draft = {
+			...draftOf(),
+			levels: {
+				L1: { id: "L1", name: "First floor", ordinal: 1 },
+				L0: level,
+				B1: { id: "B1", name: "Car park", ordinal: -1 },
+			},
+		};
+		expect(compile(draft).levels.map((l) => l.id)).toEqual(["B1", "L0", "L1"]);
+	});
+
 	it("turns each Space into a map feature placed by its metres, north up", () => {
 		const bundle = compile(draftOf(unit("a", 0, "Unit 1")));
 

@@ -1,25 +1,26 @@
 # Progress: pick up here
 
-Last updated: 2026-10-28. Read this first when resuming work, then [GLOSSARY.md](../GLOSSARY.md) for the domain language, [roadmap.md](roadmap.md) for product decisions and [adr/](adr/) for architecture decisions.
+Last updated: 2026-10-29. Read this first when resuming work, then [GLOSSARY.md](../GLOSSARY.md) for the domain language, [roadmap.md](roadmap.md) for product decisions and [adr/](adr/) for architecture decisions.
 
 ## Where we are
 
 We're building the **alpha** (see Phases in the roadmap). Steps so far:
 
-| Step | What                                                                                   | Status                                  |
-| ---- | -------------------------------------------------------------------------------------- | --------------------------------------- |
-| 1    | Operations and undo/redo in `packages/domain`                                          | ✅ Done (merged)                        |
-| 2    | Geometry in `packages/geometry`: snapping, split/merge/overlaps, Magic fill            | ✅ Done (merged)                        |
-| 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools | ✅ Done (merged)                        |
-| 4    | Saving: sign-in, API, database, Underlay upload                                        | ✅ Done (merged)                        |
-| 5    | Publishing and the first Embed (ADR 0003 amendment)                                    | ✅ Done (merged)                        |
-| 6    | Listings and Categories, placed on the map, through to the Embed (ADR 0006)            | ✅ Done on `feat/listings` (PR pending) |
+| Step | What                                                                                    | Status                                |
+| ---- | --------------------------------------------------------------------------------------- | ------------------------------------- |
+| 1    | Operations and undo/redo in `packages/domain`                                           | ✅ Done (merged)                      |
+| 2    | Geometry in `packages/geometry`: snapping, split/merge/overlaps, Magic fill             | ✅ Done (merged)                      |
+| 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools  | ✅ Done (merged)                      |
+| 4    | Saving: sign-in, API, database, Underlay upload                                         | ✅ Done (merged)                      |
+| 5    | Publishing and the first Embed (ADR 0003 amendment)                                     | ✅ Done (merged)                      |
+| 6    | Listings and Categories, placed on the map, through to the Embed (ADR 0006)             | ✅ Done (merged)                      |
+| 7    | Levels: add, rename, reorder, delete and switch, in the editor and the Embed (ADR 0007) | ✅ Done on `feat/levels` (PR pending) |
 
-The whole journey now works: draw, place Listings (shops, departments) on the map, publish, paste one line, and Visitors can search a live map. What comes next is open: see [Next](#next).
+The whole journey now works across several floors: draw each Level, place Listings (shops, departments) on the map, publish, paste one line, and Visitors can search a live map and switch floors. What comes next is open: see [Next](#next).
 
 ## What's built
 
-**`packages/domain`**: a Draft holds Spaces and Listings. Operations (`addSpace`, `removeSpaces`, `replaceSpaces`, `reshapeSpace`, `updateSpace`, `addListing`, `updateListing`, `removeListing`) are applied to a Draft by `applyOperation`, which returns the new Draft plus the Operation that reverses it. `History` provides `perform` / `undo` / `redo` on top (ADR 0004). `parseOperation` checks that untrusted input is a well-formed Operation (including length limits and http(s)-only websites). Listings keep the ids of deleted Spaces, so undo restores placement (ADR 0006).
+**`packages/domain`**: a Draft holds Levels, Spaces and Listings. Operations (`addSpace`, `removeSpaces`, `replaceSpaces`, `reshapeSpace`, `updateSpace`, `addListing`, `updateListing`, `removeListing`, `addLevel`, `updateLevel`, `reorderLevels`, `removeLevel`) are applied to a Draft by `applyOperation`, which returns the new Draft plus the Operation that reverses it. `History` provides `perform` / `undo` / `redo` on top (ADR 0004). `parseOperation` checks that untrusted input is a well-formed Operation (including length limits and http(s)-only websites). Listings keep the ids of deleted Spaces, so undo restores placement (ADR 0006). Levels (ADR 0007): ordinals are floor numbers (0 is ground, basements negative, unique, gaps allowed); a Space must be on a Level that exists; `removeLevel` takes the Level's Spaces with it and its inverse is an `addLevel` carrying them back; a Map always keeps one Level. Level ids are restricted to `LEVEL_ID` (they go into storage keys).
 
 **`packages/geometry`**: everything is in metres except `traceRoom`, which works in Underlay pixels.
 - `snap`: close the shape, then corner, then edge, then 45°/90° angle plus alignment guides, then grid on whichever axes nothing else has fixed.
@@ -28,31 +29,32 @@ The whole journey now works: draw, place Listings (shops, departments) on the ma
 
 **`apps/api`**: Fastify + Drizzle + Better Auth.
 - Auth at `/api/auth/*`: email and password, plus Organisations (each sign-up creates one). The auth tables in `src/db/auth-schema.ts` mirror Better Auth 1.7's `getAuthTables`; update them when upgrading.
-- `GET/POST /api/maps`, `GET /api/maps/:id` (with Levels and their Underlays). A new Map gets a "Ground floor" Level.
+- `GET/POST /api/maps`, `GET /api/maps/:id` (with `underlays` by Level id; the Levels themselves come from the Draft). A new Map's Draft starts with a "Ground floor", stored as a snapshot at sequence 0 (ADR 0007).
 - `GET/POST/PATCH/DELETE /api/categories`: per Organisation, unique ignoring case (ADR 0006).
 - `PUT /api/maps/:id/logos` stores a logo; `GET /api/public/logos/…` serves it to anyone. That route only ever serves logo keys, never floor plans or bundles.
 - `AppDeps.publicUrl` (`BASE_URL`) is where the API is publicly reachable, used for absolute logo URLs in bundles.
 - `GET /api/maps/:id/draft` and `POST /api/maps/:id/operations`. The Draft is a log of Operations with a snapshot every 50 (ADR 0005). Saves are rejected with 409 if out of date, 422 if an Operation doesn't apply, and 400 if malformed.
-- `PUT/GET /api/levels/:id/underlay`: PNG, JPEG or WebP only, served with `nosniff` and a sandboxing CSP. Files go through the `Storage` interface: memory in tests, `.data/files` in development.
+- `PUT/GET /api/maps/:mapId/levels/:levelId/underlay`, for any Level in the Draft, stored in the `underlay` table keyed by Map and Level id: PNG, JPEG or WebP only, served with `nosniff` and a sandboxing CSP. Files go through the `Storage` interface: memory in tests, `.data/files` in development.
 - `POST /api/maps/:id/publish` compiles the saved Draft into a new Published Version (stored through `Storage`) and creates the Map's first Embed if needed. `GET /api/public/embeds/:id` serves the latest bundle to anyone, cross-origin, cached for 60s.
 - Every route checks that the user belongs to the Map's Organisation (404 otherwise), except the public Embed route.
-- Database: real Postgres when `DATABASE_URL` is set; otherwise PGlite stored in `.data/pglite`; or entirely in memory with `KESTREL_EPHEMERAL=1` (browser tests). Migrations are in `drizzle/` and run on start.
+- Database: real Postgres when `DATABASE_URL` is set; otherwise PGlite stored in `.data/pglite`; or entirely in memory with `KESTREL_EPHEMERAL=1` (browser tests). Migrations are in `drizzle/` and run on start. `0003_levels_in_draft` is hand-written (data moves into Drafts); its `meta/0003_snapshot.json` was edited by hand to match the schema, since drizzle-kit's custom migrations copy the previous snapshot.
 
 **`apps/editor`**: React + react-konva.
 - `App.tsx` / `screens.tsx`: sign in or sign up, then the Map picker, then the editor. The open Map is kept in the URL (`?map=…`).
 - `src/api.ts`: the API client.
 - `src/editor/sync.ts`: the save queue. It sends applied Operations in order, batching edits made during a save; goes offline and retries with backoff on network failure; stops on a conflict or rejection.
-- `src/editor/store.ts`: Zustand store over `History`, plus the selection and the last rejected Operation's error. It reports every applied Operation (including undo and redo) to the save queue, and checks Operations with `parseOperation` first, so one bad field can't stop saving.
+- `src/editor/store.ts`: Zustand store over `History`, plus the Level being shown (`levelId`, `showLevel`; it opens on the floor closest to 0 and moves to the nearest floor if the shown Level goes away), the selection (only Spaces on that Level) and the last rejected Operation's error. It reports every applied Operation (including undo and redo) to the save queue, and checks Operations with `parseOperation` first, so one bad field can't stop saving.
 - `src/editor/tools/`: one hook per tool, `useBoxTool`, `useFillTool`, `useSplitTool` and `usePenTool`, all built on the `Tool` interface in `tool.ts`. Tools do their own hit-testing with geometry; Konva only draws.
+- `LevelPanel.tsx`: the column left of the canvas: floors highest first, + Level above/below, Rename, ↑/↓ (swaps floor numbers with the neighbour in one `reorderLevels`) and Delete with an inline warning (no browser dialogs).
 - `LevelCanvas.tsx`: zoom, pan, and mouse handling through native events, since they carry the real click count.
 - `PublishPanel.tsx`: after Publish (which waits for unsaved edits), the embed code with Copy and a link to the Embed. `VITE_EMBED_URL` says where the Embed is served (default `http://localhost:5174`).
 - `SidePanel.tsx`: Spaces and Listings tabs. A selected Space shows its Space Reference, Space Kind and the Listings "In this Space", with search-to-place or create-by-name. The Listing editor covers name, Category (created inline), logo, description, website and hours. The Listings tab has an Unplaced filter.
-- `Editor.tsx`: toolbar, shortcuts (B/F/S/P, M, Delete, Ctrl+Z / Ctrl+Shift+Z; Esc leaves a text field), save status, and a conflict banner with Reload. Floor plans are converted to PNG in the browser (`toUploadablePng`) before upload.
+- `Editor.tsx`: toolbar, shortcuts (B/F/S/P, M, Delete, Ctrl+Z / Ctrl+Shift+Z; Esc leaves a text field), save status, and a conflict banner with Reload. Floor plans are converted to PNG in the browser (`toUploadablePng`) before upload, one per Level; switching Level loads that Level's plan.
 - The dev server proxies `/api` to the API (`API_URL`, default `http://localhost:3000`), so cookies stay on the editor's origin.
 
-**`packages/publish`**: `compileBundle` turns a Draft into a Published Version bundle: GeoJSON Spaces at 0°, 0° (north up, anticlockwise rings), placed Listings (only Spaces that exist; Category and absolute logo URL), the directory (Listings plus Facilities, natural order; vacant units drop out), map labels (Listing name, else Space Reference), bounds. Bundle format 2. Output doesn't depend on drawing order. Also the shared Space Kind colours and labels.
+**`packages/publish`**: `compileBundle` turns a Draft into a Published Version bundle: Levels from the Draft, lowest floor first; GeoJSON Spaces at 0°, 0° (north up, anticlockwise rings), placed Listings (only Spaces that exist; Category and absolute logo URL), the directory (Listings plus Facilities, natural order; vacant units drop out), map labels (Listing name, else Space Reference), bounds. Bundle format 2. Output doesn't depend on drawing order. Also the shared Space Kind colours and labels.
 
-**`apps/embed`**: plain TypeScript + MapLibre, opened as `/?embed=<id>` in an iframe. Spaces coloured by Space Kind with HTML labels (no font server), a searchable directory with logos, a Category filter and a live result count (the accessible route; the canvas is hidden from screen readers and the tab order), selection that highlights all the entry's Spaces and centres them, and a details card (logo, Category, description, hours, website). Mobile-first. MapLibre's worker is bundled explicitly via `?worker&url`, since MapLibre picks its file at runtime. `VITE_API_URL` says where the API is (same origin via the dev proxy by default).
+**`apps/embed`**: plain TypeScript + MapLibre, opened as `/?embed=<id>` in an iframe. It opens on the floor closest to 0; with several Levels it shows a Level switcher (44 px targets) and says each directory entry's floor, and choosing a place on another floor goes there. Spaces and labels are filtered by Level. Spaces coloured by Space Kind with HTML labels (no font server), a searchable directory with logos, a Category filter and a live result count (the accessible route; the canvas is hidden from screen readers and the tab order), selection that highlights all the entry's Spaces and centres them, and a details card (logo, Category, description, hours, website). Mobile-first. MapLibre's worker is bundled explicitly via `?worker&url`, since MapLibre picks its file at runtime. `VITE_API_URL` says where the API is (same origin via the dev proxy by default).
 
 **`apps/web`, `packages/ui`**: scaffolds only.
 
@@ -68,8 +70,8 @@ pnpm --filter @kestrel/editor dev        # editor at http://localhost:5173 → c
 pnpm --filter @kestrel/embed dev         # Embed at http://localhost:5174 (open it from Publish)
 pnpm check       # Biome lint + format (run `pnpm format` twice if imports were reordered)
 pnpm typecheck
-pnpm test        # Vitest unit tests (99)
-pnpm e2e         # Playwright browser tests (17) in the installed Microsoft Edge; starts its own API, editor and a production build of the Embed
+pnpm test        # Vitest unit tests (127)
+pnpm e2e         # Playwright browser tests (20) in the installed Microsoft Edge; starts its own API, editor and a production build of the Embed
 ```
 
 ## How we work
@@ -92,11 +94,15 @@ pnpm e2e         # Playwright browser tests (17) in the installed Microsoft Edge
 - **Cross-site request protection is untested**: Better Auth relaxes its Origin check under Vitest, so only the browser tests (and a manual curl check) exercise it.
 - **Scale is assumed** at 20 Underlay pixels = 1 m until the scale-setting step exists. The API stores `underlayPixelsPerMetre` ready for it.
 - **Underlays are images only**; there's no PDF upload yet.
-- **One Level only**: the editor uses each Map's first Level. There's no way yet to add Levels or switch between them.
+- **No Alignment yet**: every Level is drawn on the shared plane, but Underlays can't yet be pinned to the Level below, so a second floor's plan sits wherever its image lands.
+- **Undo can change a Level you can't see**: undoing an edit made on another floor applies it there without switching to it.
+- **Empty Levels are published**: a Level with no Spaces still appears in the Embed's switcher.
+- **Underlay rows outlive removed Levels** (deliberately, so undo brings the plan back). Nothing cleans them up yet.
+- **A replaced floor plan can come back from the browser cache**: the Underlay route is cached as immutable at a fixed URL, so after re-uploading, a reload may show the old plan until the cache clears. Version the URL (e.g. by storage key) to fix.
 - **Labels can collide**: Space labels sit at the centre of the bounding box, so they can overlap the plan's own text and fall outside L-shaped Spaces.
 - **Pressing inside an existing Space with the Box tool moves it** rather than starting a new box. This is intended, but worth watching in user testing.
 - **Magic fill is slow on big plans**, because the wall grid is rebuilt when the darkness slider or closed openings change.
-- **The Embed is basic**: one Level (no Level switcher yet), no Allowed Domains or Kiosk Mode, and its labels don't avoid each other, so small Spaces' labels can overlap.
+- **The Embed is basic**: no Allowed Domains or Kiosk Mode, and its labels don't avoid each other, so small Spaces' labels can overlap.
 - **The Embed is heavy**: about 1.1 MB of JavaScript plus a 0.5 MB worker, almost all MapLibre. Fine for alpha; worth trimming before launch.
 - **Listings: still to come**: dragging from the Unplaced list onto the map; renaming and deleting Categories in the editor (the API supports it); logos on the map itself; structured opening hours ("open now"); importing Listings from a CSV or CMS; publishing Listings without geometry.
 - **A Space with several Listings is labelled with the first**, on the canvas and in the Embed.
@@ -107,8 +113,7 @@ pnpm e2e         # Playwright browser tests (17) in the installed Microsoft Edge
 
 The alpha scope in the roadmap still needs, roughly in order:
 
-1. **Levels**: add, rename and reorder Levels, switch between them, and Alignment (pin each Level's Underlay to the one below).
-2. **Scale-setting** in onboarding (draw a line, enter its length), replacing the 20 px/m assumption.
-3. **Amenities**: icons at a point (Lucide, converted for MapLibre), including fire-safety ones and a Safety layer in the Embed.
-4. **Deployment** for alpha partners: hosting, Neon, the R2 adapter, the Embed on a CDN, and email for account recovery.
-5. **PDF Underlays**.
+1. **Scale-setting and Alignment**, together: set the first Level's scale (draw a line, enter its length), replacing the 20 px/m assumption, then pin every other Level's Underlay to an aligned one by two matching points (ADR 0001 amendment). Both change only how an Underlay sits on the plane, never the Draft (ADR 0007).
+2. **Amenities**: icons at a point (Lucide, converted for MapLibre), including fire-safety ones and a Safety layer in the Embed.
+3. **Deployment** for alpha partners: hosting, Neon, the R2 adapter, the Embed on a CDN, and email for account recovery.
+4. **PDF Underlays**.
