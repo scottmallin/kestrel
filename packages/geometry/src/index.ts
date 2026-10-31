@@ -31,5 +31,6 @@ export function containsPoint(outline: Polygon, p: Point): boolean {
 }
 
 export * from "./boolean.ts";
+export * from "./placement.ts";
 export * from "./snap.ts";
 export * from "./trace.ts";
