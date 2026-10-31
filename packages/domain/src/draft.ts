@@ -64,7 +64,8 @@ export type Operation =
 			/** The result of scaling the whole plane (ADR 0008): Spaces and Placements as they end up. */
 			readonly type: "rescaleBuilding";
 			readonly spaces: readonly Space[];
-			readonly placements: Readonly<Record<string, Placement>>;
+			/** null means the Level has no Placement (so undoing a rescale can take one away). */
+			readonly placements: Readonly<Record<string, Placement | null>>;
 	  };
 
 export type LevelChanges = { readonly name?: string };
@@ -364,22 +365,18 @@ export function applyOperation(
 				previousSpaces.push(existing);
 				spaces[space.id] = space;
 			}
-			const placements = { ...draft.placements };
-			const previousPlacements: Record<string, Placement> = {};
+			const placements: Record<string, Placement> = { ...draft.placements };
+			const previousPlacements: Record<string, Placement | null> = {};
 			for (const [levelId, placement] of Object.entries(operation.placements)) {
 				if (!draft.levels[levelId])
 					return { ok: false, error: `No Level with id ${levelId}` };
-				const invalid = checkPlacement(placement);
-				if (invalid) return invalid;
-				const previous = draft.placements[levelId];
-				// A rescale only scales Placements that exist; one appearing has no previous value to restore.
-				if (!previous)
-					return {
-						ok: false,
-						error: `Level ${levelId} has no Placement to rescale`,
-					};
-				previousPlacements[levelId] = previous;
-				placements[levelId] = placement;
+				if (placement) {
+					const invalid = checkPlacement(placement);
+					if (invalid) return invalid;
+				}
+				previousPlacements[levelId] = draft.placements[levelId] ?? null;
+				if (placement) placements[levelId] = placement;
+				else delete placements[levelId];
 			}
 			return {
 				ok: true,

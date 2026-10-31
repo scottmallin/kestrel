@@ -98,13 +98,12 @@ describe("rescaleBuilding", () => {
 		expect(applyOk(rescaled.draft, rescaled.inverse).draft).toEqual(before);
 	});
 
-	it("rejects a Space that doesn't exist or moves Level, or a Placement that isn't there to rescale", () => {
+	it("rejects a Space that doesn't exist or moves Level, or a Placement for no Level", () => {
 		const draft = building();
 		const errors = [
 			{ spaces: [unit("ghost", "g")], placements: {} },
 			{ spaces: [unit("a", "f1")], placements: {} },
 			{ spaces: [], placements: { nope: plan } },
-			{ spaces: [], placements: { f1: plan } },
 		].map((change) =>
 			applyOperation(draft, { type: "rescaleBuilding", ...change }),
 		);
@@ -113,8 +112,21 @@ describe("rescaleBuilding", () => {
 			{ ok: false, error: "No Space with id ghost" },
 			{ ok: false, error: "Space a can't change Level while rescaling" },
 			{ ok: false, error: "No Level with id nope" },
-			{ ok: false, error: "Level f1 has no Placement to rescale" },
 		]);
+	});
+});
+
+describe("rescaleBuilding and unplaced plans", () => {
+	it("can place a plan that had no Placement, and undo takes it away again", () => {
+		const before = building();
+		const rescaled = applyOk(before, {
+			type: "rescaleBuilding",
+			spaces: [],
+			placements: { f1: { ...plan, scale: 0.1 } },
+		});
+
+		expect(rescaled.draft.placements.f1?.scale).toBe(0.1);
+		expect(applyOk(rescaled.draft, rescaled.inverse).draft).toEqual(before);
 	});
 });
 

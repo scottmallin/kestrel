@@ -214,11 +214,12 @@ function placement(value: unknown, what: string): Placement {
 	};
 }
 
-function placements(value: unknown): Record<string, Placement> {
+function placements(value: unknown): Record<string, Placement | null> {
 	const p = record(value, "placements");
-	const result: Record<string, Placement> = {};
+	const result: Record<string, Placement | null> = {};
 	for (const [id, v] of Object.entries(p))
-		result[levelId(id, "placements key")] = placement(v, `placements.${id}`);
+		result[levelId(id, "placements key")] =
+			v === null ? null : placement(v, `placements.${id}`);
 	return result;
 }
 
