@@ -64,6 +64,7 @@ describe("Levels", () => {
 					[groundId]: { id: groundId, name: "Ground floor", ordinal: 0 },
 				},
 				placements: {},
+				scaleSet: false,
 				spaces: {},
 				listings: {},
 			},

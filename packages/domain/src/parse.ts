@@ -303,6 +303,12 @@ function operation(input: unknown): Operation {
 					? o.spaces.map((s, i) => space(s, `spaces[${i}]`))
 					: fail("spaces must be a list"),
 				placements: placements(o.placements),
+				...(o.scaleSet !== undefined && {
+					scaleSet:
+						typeof o.scaleSet === "boolean"
+							? o.scaleSet
+							: fail("scaleSet must be true or false"),
+				}),
 			};
 		default:
 			return fail(`Unknown Operation type ${JSON.stringify(o.type)}`);

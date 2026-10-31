@@ -6,6 +6,8 @@ export type Draft = {
 	readonly levels: Readonly<Record<string, Level>>;
 	/** Where each Level's Underlay sits on the plane, by Level id (ADR 0008). */
 	readonly placements: Readonly<Record<string, Placement>>;
+	/** Whether the Building's scale has been set, on any Level (ADR 0008 amendment). */
+	readonly scaleSet: boolean;
 	readonly spaces: Readonly<Record<string, Space>>;
 	readonly listings: Readonly<Record<string, Listing>>;
 };
@@ -66,6 +68,8 @@ export type Operation =
 			readonly spaces: readonly Space[];
 			/** null means the Level has no Placement (so undoing a rescale can take one away). */
 			readonly placements: Readonly<Record<string, Placement | null>>;
+			/** Whether the scale is set afterwards. Absent in Operations logged before it existed, meaning true. */
+			readonly scaleSet?: boolean;
 	  };
 
 export type LevelChanges = { readonly name?: string };
@@ -99,6 +103,7 @@ export type ApplyResult =
 export const emptyDraft = (): Draft => ({
 	levels: {},
 	placements: {},
+	scaleSet: false,
 	spaces: {},
 	listings: {},
 });
@@ -380,11 +385,17 @@ export function applyOperation(
 			}
 			return {
 				ok: true,
-				draft: { ...draft, spaces, placements },
+				draft: {
+					...draft,
+					spaces,
+					placements,
+					scaleSet: operation.scaleSet ?? true,
+				},
 				inverse: {
 					type: "rescaleBuilding",
 					spaces: previousSpaces,
 					placements: previousPlacements,
+					scaleSet: draft.scaleSet,
 				},
 			};
 		}

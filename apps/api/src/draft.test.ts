@@ -42,7 +42,13 @@ describe("Draft", () => {
 		const { load, levels } = await newMap();
 		expect(await load()).toEqual({
 			seq: 0,
-			draft: { levels, placements: {}, spaces: {}, listings: {} },
+			draft: {
+				levels,
+				placements: {},
+				scaleSet: false,
+				spaces: {},
+				listings: {},
+			},
 		});
 	});
 
@@ -61,6 +67,7 @@ describe("Draft", () => {
 			draft: {
 				levels,
 				placements: {},
+				scaleSet: false,
 				spaces: { a: box("a", 0), b: box("b", 10) },
 				listings: {},
 			},
@@ -92,7 +99,13 @@ describe("Draft", () => {
 		});
 		expect(await load()).toEqual({
 			seq: 0,
-			draft: { levels, placements: {}, spaces: {}, listings: {} },
+			draft: {
+				levels,
+				placements: {},
+				scaleSet: false,
+				spaces: {},
+				listings: {},
+			},
 		});
 	});
 
@@ -122,7 +135,13 @@ describe("Draft", () => {
 		}
 		expect(await load()).toEqual({
 			seq: 0,
-			draft: { levels, placements: {}, spaces: {}, listings: {} },
+			draft: {
+				levels,
+				placements: {},
+				scaleSet: false,
+				spaces: {},
+				listings: {},
+			},
 		});
 	});
 

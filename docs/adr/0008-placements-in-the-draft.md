@@ -29,3 +29,13 @@ ADR 0007 kept scale and Alignment outside the Draft. Then a rescale would be hal
 - A rescale is one Operation that can be large (every Space's outline). That's fine at the scale of a venue.
 - Uploading a new plan for a Level keeps its Placement; if the new image is framed differently, the plan needs its scale set or aligning again.
 - Magic fill converts between plane and image through the Placement, so it works on rotated and offset plans.
+
+## Amendment (2026-10-31): set up a Level before drawing on it
+
+Drawing over a plan before it was scaled or aligned left Spaces stranded when the plan later moved (Align moves the plan, not the Spaces traced on it). So:
+
+- **The Building's scale is set once**, on any Level: on a plan, or by measuring Spaces on a blank grid. The Draft records it (`scaleSet`, carried by `rescaleBuilding`, whose result it is), and it applies to every Level.
+- **A Level with a plan is locked for drawing until its plan is placed.** The next step is Set scale while the Building's scale isn't set, and Align plan after that. Levels without a plan (a blank grid) can always be drawn on: they're on the plane by default.
+- **Align needs the scale set.** Its ghost shows the reference Level's plan as well as its Spaces.
+- **Set scale places only the plan it was measured on** (when it's the first), and rescales every Placement that exists. Other unplaced plans stay unplaced, their Levels locked, until aligned.
+- **Re-uploading a plan clears its Placement**, so the Level locks until the new image is aligned (to its own Spaces, if it has any). Aligning never moves Spaces: with the lock, Spaces are only ever drawn on placed plans, so they're already right.
