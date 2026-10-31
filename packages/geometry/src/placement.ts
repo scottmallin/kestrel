@@ -63,6 +63,32 @@ export function placementFromPairs(
 	return { scale, rotation, x: p0.x - unshifted.x, y: p0.y - unshifted.y };
 }
 
+/**
+ * Alignment for a plan whose own scale is already set: turns and moves it so the first image point lands on
+ * the first plane point and the line between them points the same way, keeping `scale`. `mismatch` says how
+ * much longer (positive) or shorter the line is on the plane than on the plan at that scale, so a mis-click or
+ * a wrong scale can be caught. Null if either pair is a single point.
+ */
+export function alignAtScale(
+	image: readonly [Point, Point],
+	plane: readonly [Point, Point],
+	scale: number,
+): { placement: Placement; mismatch: number } | null {
+	const free = placementFromPairs(image, plane);
+	if (!free) return null;
+	const rotation = free.rotation;
+	const unshifted = toPlane({ scale, rotation, x: 0, y: 0 }, image[0]);
+	return {
+		placement: {
+			scale,
+			rotation,
+			x: plane[0].x - unshifted.x,
+			y: plane[0].y - unshifted.y,
+		},
+		mismatch: free.scale / scale - 1,
+	};
+}
+
 /** How much to scale the plane so the line from a to b is `metres` long, or null if that's impossible. */
 export function rescaleFactor(
 	a: Point,

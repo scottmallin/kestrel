@@ -8,6 +8,8 @@ export type Draft = {
 	readonly placements: Readonly<Record<string, Placement>>;
 	/** Whether the Building's scale has been set, on any Level (ADR 0008 amendment). */
 	readonly scaleSet: boolean;
+	/** Levels whose plan has its own scale set but isn't aligned yet; other Placements are aligned. */
+	readonly unaligned: Readonly<Record<string, true>>;
 	readonly spaces: Readonly<Record<string, Space>>;
 	readonly listings: Readonly<Record<string, Listing>>;
 };
@@ -44,6 +46,8 @@ export type Operation =
 			readonly spaces?: readonly Space[];
 			/** Its Underlay's Placement, used when undoing its removal. */
 			readonly placement?: Placement;
+			/** Whether that Placement was still waiting to be aligned. */
+			readonly unaligned?: true;
 	  }
 	| {
 			readonly type: "updateLevel";
@@ -61,6 +65,8 @@ export type Operation =
 			readonly levelId: string;
 			/** null clears it, so the Underlay shows at the default Placement. */
 			readonly placement: Placement | null;
+			/** false when only the plan's own scale is set and it still needs aligning. Absent means aligned. */
+			readonly aligned?: boolean;
 	  }
 	| {
 			/** The result of scaling the whole plane (ADR 0008): Spaces and Placements as they end up. */
@@ -104,6 +110,7 @@ export const emptyDraft = (): Draft => ({
 	levels: {},
 	placements: {},
 	scaleSet: false,
+	unaligned: {},
 	spaces: {},
 	listings: {},
 });
@@ -261,6 +268,9 @@ export function applyOperation(
 								...added.draft.placements,
 								[level.id]: operation.placement,
 							},
+							...(operation.unaligned && {
+								unaligned: { ...added.draft.unaligned, [level.id]: true },
+							}),
 						}
 					: added.draft,
 				inverse: { type: "removeLevel", id: level.id },
@@ -317,14 +327,16 @@ export function applyOperation(
 			const spaces = { ...draft.spaces };
 			for (const space of onLevel) delete spaces[space.id];
 			const { [level.id]: placement, ...placements } = draft.placements;
+			const { [level.id]: wasUnaligned, ...unaligned } = draft.unaligned;
 			return {
 				ok: true,
-				draft: { ...draft, levels, spaces, placements },
+				draft: { ...draft, levels, spaces, placements, unaligned },
 				inverse: {
 					type: "addLevel",
 					level,
 					...(onLevel.length > 0 && { spaces: onLevel }),
 					...(placement && { placement }),
+					...(placement && wasUnaligned && { unaligned: true as const }),
 				},
 			};
 		}
@@ -337,16 +349,23 @@ export function applyOperation(
 				if (invalid) return invalid;
 			}
 			const { [levelId]: previous, ...others } = draft.placements;
+			const { [levelId]: wasUnaligned, ...stillUnaligned } = draft.unaligned;
+			const unaligned =
+				placement && operation.aligned === false
+					? { ...stillUnaligned, [levelId]: true as const }
+					: stillUnaligned;
 			return {
 				ok: true,
 				draft: {
 					...draft,
 					placements: placement ? { ...others, [levelId]: placement } : others,
+					unaligned,
 				},
 				inverse: {
 					type: "placeUnderlay",
 					levelId,
 					placement: previous ?? null,
+					...(previous && wasUnaligned && { aligned: false }),
 				},
 			};
 		}

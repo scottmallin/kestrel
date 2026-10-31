@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	alignAtScale,
 	DEFAULT_PLACEMENT,
 	type Placement,
 	placementFromPairs,
@@ -123,5 +124,46 @@ describe("rescaling the Building", () => {
 		const [moved] = scalePolygon([onPlan], 2.5);
 
 		close(toPlane(scaled, pixel), moved as { x: number; y: number });
+	});
+});
+
+describe("alignAtScale", () => {
+	it("keeps the plan's own scale, turning and moving it to the first match and along the second", () => {
+		const truth: Placement = { scale: 0.04, rotation: 0.4, x: 7, y: -2 };
+		const image = [
+			{ x: 10, y: 20 },
+			{ x: 500, y: 300 },
+		] as const;
+		const result = alignAtScale(
+			image,
+			[toPlane(truth, image[0]), toPlane(truth, image[1])],
+			0.04,
+		);
+		if (!result) throw new Error("expected a result");
+
+		expect(result.placement.scale).toBe(0.04);
+		expect(result.placement.rotation).toBeCloseTo(0.4, 9);
+		close(toPlane(result.placement, image[0]), toPlane(truth, image[0]));
+		expect(result.mismatch).toBeCloseTo(0, 9);
+	});
+
+	it("says how much further apart the points are on the plane than on the plan at its scale", () => {
+		const result = alignAtScale(
+			[
+				{ x: 0, y: 0 },
+				{ x: 100, y: 0 },
+			],
+			[
+				{ x: 0, y: 0 },
+				{ x: 11, y: 0 },
+			],
+			0.1,
+		);
+		expect(result?.mismatch).toBeCloseTo(0.1, 9);
+	});
+
+	it("can't work from two points in the same place", () => {
+		const p = { x: 3, y: 3 };
+		expect(alignAtScale([p, p], [p, { x: 9, y: 9 }], 0.1)).toBeNull();
 	});
 });

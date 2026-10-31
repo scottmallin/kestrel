@@ -154,10 +154,8 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 			return "Align this Level's floor plan before drawing on it";
 		if (name === "align" && !hasPlan)
 			return "Upload a floor plan for this Level first";
-		if (name === "align" && !history.draft.scaleSet)
-			return "Set the scale first, then align other floors to it";
-		if (name === "scale" && setup === "align")
-			return "The scale is already set: align this plan instead";
+		if (name === "align" && !history.draft.placements[levelId])
+			return "Set this plan's scale first, then align it";
 		return null;
 	};
 	// A locked tool gives way to the Level's next setup step.
@@ -175,6 +173,13 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	useEffect(() => {
 		if (activeTool !== toolName) setToolName(activeTool);
 	}, [activeTool, toolName]);
+	// Once a plan's own scale is set, go straight on to aligning it.
+	const previousSetup = useRef(setup);
+	useEffect(() => {
+		if (previousSetup.current === "setScale" && setup === "align")
+			setToolName("align");
+		previousSetup.current = setup;
+	}, [setup]);
 
 	// Warn before leaving with edits that haven't reached the server.
 	useEffect(() => {
@@ -196,7 +201,9 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 			const { history, perform } = store.getState();
 			if (history.draft.placements[forLevel]) {
 				perform({ type: "placeUnderlay", levelId: forLevel, placement: null });
-				setNotice("New floor plan uploaded: align it before drawing on it.");
+				setNotice(
+					"New floor plan uploaded: set its scale and align it before drawing on it.",
+				);
 			} else setNotice(null);
 		} catch (e) {
 			setNotice(

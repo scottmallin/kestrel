@@ -1,6 +1,6 @@
 import {
+	alignAtScale,
 	type Point,
-	placementFromPairs,
 	type Snap,
 	snap,
 	toImage,
@@ -11,6 +11,9 @@ import { Circle, Group, Image as KonvaImage, Line, Text } from "react-konva";
 import { SnapMarker } from "../shapes.tsx";
 import { outlinesOf, type Tool, type ToolContext } from "../tool.ts";
 import { loadUnderlayImage } from "../underlay.ts";
+
+/** How far the two floors may disagree about the distance between the points (clicks aren't exact). */
+const MAX_MISMATCH = 0.05;
 
 /** The ghost of the Level being aligned to, and the points picked on it. */
 const GHOST = "#c026d3";
@@ -79,15 +82,28 @@ export function useAlignTool(ctx: ToolContext): Tool {
 
 	const finish = (plan: Point[], ghost: Point[]) => {
 		reset();
-		const placement = placementFromPairs(
+		if (!underlay) return;
+		// The plan keeps the scale measured on it; the points only turn and move it.
+		const result = alignAtScale(
 			plan as [Point, Point],
 			ghost as [Point, Point],
+			underlay.placement.scale,
 		);
-		if (!placement) {
+		if (!result) {
 			setStatus("Pick two different points on each, as far apart as you can.");
 			return;
 		}
-		store.getState().perform({ type: "placeUnderlay", levelId, placement });
+		if (Math.abs(result.mismatch) > MAX_MISMATCH) {
+			setStatus(
+				`Those points are ${Math.round(Math.abs(result.mismatch) * 100)}% ${result.mismatch > 0 ? "further apart" : "closer together"} on ${reference?.name} than on this plan at its scale. Check you picked matching points, or set this plan's scale again.`,
+			);
+			return;
+		}
+		store.getState().perform({
+			type: "placeUnderlay",
+			levelId,
+			placement: result.placement,
+		});
 		setDone(`Plan aligned to ${reference?.name}. Ctrl+Z undoes it.`);
 	};
 

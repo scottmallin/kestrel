@@ -43,7 +43,7 @@ test("a floor plan locks drawing on its Level until the scale is set", async ({
 	await expect(tool(page, /Set scale/)).toHaveAttribute("aria-pressed", "true");
 	await expect(
 		levelPanel(page).getByRole("region", { name: "Set up this Level" }),
-	).toContainText("Set the scale");
+	).toContainText("Set its scale");
 
 	await setScale(page, editor, { x: 2, y: 2 }, { x: 12, y: 2 }, 20);
 
@@ -71,12 +71,12 @@ test("setting the scale on a blank grid rescales what's drawn, and undo puts it 
 	expect((await savedDraft(page)).scaleSet).toBe(false);
 });
 
-test("another floor's plan must be aligned before drawing, and aligning it again after a new upload", async ({
+test("another floor's plan gets its own scale, then is aligned, before drawing on it", async ({
 	page,
 }) => {
 	const editor = await openEditor(page, { grid: true, samplePlan: false });
 	await editor.drag({ x: 0, y: 0 }, { x: 20, y: 10 });
-	// Align needs the Building's scale: set it on the blank ground floor (20 m stays 20 m).
+	// Align needs a scale: set the Building's on the blank ground floor (20 m stays 20 m).
 	await expect(tool(page, /Align plan/)).toBeDisabled();
 	await setScale(page, editor, { x: 0, y: 0 }, { x: 20, y: 0 }, 20);
 	await page.keyboard.press("Escape");
@@ -85,38 +85,59 @@ test("another floor's plan must be aligned before drawing, and aligning it again
 	await expect(tool(page, /Box/)).toBeEnabled(); // a blank grid is ready straight away
 	await page.getByRole("button", { name: "Use sample plan" }).click();
 	await expect(tool(page, /Box/)).toBeDisabled();
-	await expect(tool(page, /Set scale/)).toBeDisabled();
+	await expect(tool(page, /Align plan/)).toBeDisabled();
+	await expect(tool(page, /Set scale/)).toHaveAttribute("aria-pressed", "true");
+	await expect(levelPanel(page)).toContainText("Set scale");
+
+	// This plan's own scale: 200 px (10 m at the default 20 px/m) is really 20 m, so 0.1 m per pixel.
+	await editor.click({ x: 5, y: 5 });
+	await editor.click({ x: 15, y: 5 });
+	await expect(page.getByText("this floor's plan only")).toBeVisible();
+	await page.getByLabel("Real length in metres").fill("20");
+	await page.getByLabel("Real length in metres").press("Enter");
+	// Straight on to aligning; the ground floor's Space is untouched.
 	await expect(tool(page, /Align plan/)).toHaveAttribute(
 		"aria-pressed",
 		"true",
 	);
-	await expect(levelPanel(page)).toContainText("Align plan");
+	await expect(tool(page, /Box/)).toBeDisabled();
+	await expect(levelPanel(page)).toContainText("✓ Scale set");
 
-	// Unplaced, the plan is at 20 px per metre: (5, 5) m is pixel (100, 100), (15, 5) m is (300, 100).
+	// At 0.1 m per pixel, pixel (100, 100) is at (10, 10) m and pixel (300, 100) at (30, 10) m.
 	await expect(editor.status).toContainText("Click a point on this plan");
-	await editor.click({ x: 5, y: 5 });
+	await editor.click({ x: 10, y: 10 });
 	await expect(editor.status).toContainText(
 		"same point on the ghost of Ground floor",
 	);
 	await editor.click({ x: 0, y: 0 });
-	await editor.click({ x: 15, y: 5 });
+	await editor.click({ x: 30, y: 10 });
+	// A wrong match: 15 m apart on the ghost but 20 m on the plan.
+	await editor.click({ x: 15, y: 0 });
+	await expect(editor.status).toContainText("25% closer together");
+	await expect(tool(page, /Box/)).toBeDisabled();
+
+	await editor.click({ x: 10, y: 10 });
+	await editor.click({ x: 0, y: 0 });
+	await editor.click({ x: 30, y: 10 });
 	await editor.click({ x: 20, y: 0 });
 	await expect(editor.status).toContainText("Plan aligned to Ground floor");
 	await expect(tool(page, /Box/)).toBeEnabled();
 
-	// 200 px across now spans 20 m, so 0.1 m per pixel, moved so pixel (100, 100) sits at (0, 0).
+	// It kept its measured scale, and moved so pixel (100, 100) sits at (0, 0).
 	const draft = await savedDraft(page);
+	expect(Object.values(draft.spaces)).toHaveLength(1);
 	const levelOne = Object.values(draft.levels).find(
 		(l) => (l as { name: string }).name === "Level 1",
 	) as { id: string };
 	const placed = draft.placements[levelOne.id];
-	expect(placed.scale).toBeCloseTo(0.1, 2);
+	expect(placed.scale).toBeCloseTo(0.1, 6);
 	expect(placed.rotation).toBeCloseTo(0, 2);
 	expect(placed.x).toBeCloseTo(-10, 0);
 	expect(placed.y).toBeCloseTo(-10, 0);
+	expect(draft.unaligned).toEqual({});
 
-	// A new image might be framed differently, so it has to be aligned again.
+	// A new image might be framed differently, so it starts again.
 	await page.getByRole("button", { name: "Use sample plan" }).click();
 	await expect(tool(page, /Box/)).toBeDisabled();
-	await expect(editor.status).toContainText("align it before drawing");
+	await expect(editor.status).toContainText("set its scale and align it");
 });

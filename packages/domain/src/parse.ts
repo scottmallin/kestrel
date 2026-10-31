@@ -267,6 +267,7 @@ function operation(input: unknown): Operation {
 				...(o.placement !== undefined && {
 					placement: placement(o.placement, "placement"),
 				}),
+				...(o.unaligned === true && { unaligned: true as const }),
 				...(o.spaces !== undefined && {
 					spaces: Array.isArray(o.spaces)
 						? o.spaces.map((s, i) => space(s, `spaces[${i}]`))
@@ -295,6 +296,12 @@ function operation(input: unknown): Operation {
 				levelId: levelId(o.levelId, "levelId"),
 				placement:
 					o.placement === null ? null : placement(o.placement, "placement"),
+				...(o.aligned !== undefined && {
+					aligned:
+						typeof o.aligned === "boolean"
+							? o.aligned
+							: fail("aligned must be true or false"),
+				}),
 			};
 		case "rescaleBuilding":
 			return {

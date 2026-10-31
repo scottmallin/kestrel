@@ -117,21 +117,27 @@ export function LevelPanel({
 						<li>
 							{setup === "setScale" ? (
 								<>
-									Set the scale: draw a line along something you know the length
+									Set its scale: draw a line along something you know the length
 									of.{" "}
 									<button type="button" onClick={() => onChooseTool("scale")}>
 										Set scale
 									</button>
 								</>
 							) : (
-								<>
-									Align the plan to another floor by two matching points.{" "}
+								"✓ Scale set"
+							)}
+						</li>
+						{/* The first plan defines the plane; every later one is aligned to it. */}
+						{draft.scaleSet && (
+							<li>
+								Align it to another floor by two matching points.{" "}
+								{setup === "align" && (
 									<button type="button" onClick={() => onChooseTool("align")}>
 										Align plan
 									</button>
-								</>
-							)}
-						</li>
+								)}
+							</li>
+						)}
 					</ol>
 				</section>
 			)}

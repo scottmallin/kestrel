@@ -38,6 +38,13 @@ export function useScaleTool(ctx: ToolContext): Tool {
 			...(grid && { grid }),
 		});
 
+	// Once the Building has a scale, a later floor's plan gets its own scale, then is aligned; anywhere else,
+	// setting the scale rescales the whole Building (ADR 0008 amendment).
+	const planOnly =
+		draft.scaleSet &&
+		underlayLevelIds.has(levelId) &&
+		(!draft.placements[levelId] || draft.unaligned[levelId] === true);
+
 	const reset = () => {
 		setStart(null);
 		setLine(null);
@@ -49,6 +56,21 @@ export function useScaleTool(ctx: ToolContext): Tool {
 		const factor = rescaleFactor(line[0], line[1], Number(length));
 		if (factor === null) {
 			setStatus("Type the line's real length in metres, above 0.");
+			return;
+		}
+		if (planOnly) {
+			// Only this plan's own scale: it's aligned to the other floors next (ADR 0008 amendment).
+			const current = draft.placements[levelId] ?? DEFAULT_PLACEMENT;
+			store.getState().perform({
+				type: "placeUnderlay",
+				levelId,
+				placement: { ...current, scale: current.scale * factor },
+				aligned: false,
+			});
+			setDone(
+				`This plan's scale is set: the line is now ${Number(length)} m. Next, align it to another floor.`,
+			);
+			reset();
 			return;
 		}
 		// Placed plans scale with everything else. The plan measured on, if it's unplaced, is placed where it's
@@ -74,13 +96,18 @@ export function useScaleTool(ctx: ToolContext): Tool {
 	};
 
 	const end = line?.[1] ?? hover?.point;
+	const whatChanges = planOnly
+		? "this floor's plan only"
+		: draft.scaleSet
+			? "the whole Building: every Space and plan"
+			: "the whole Building";
 	const shown = line ?? (start && end ? ([start, end] as const) : null);
 
 	return {
 		hint: done
 			? done
 			: line
-				? "Type the line's real length in metres, then press Enter"
+				? `Type the line's real length in metres, then press Enter (this rescales ${whatChanges})`
 				: start
 					? "Click the other end of something whose length you know"
 					: "Click one end of something whose length you know, like a wall or a doorway on the plan",

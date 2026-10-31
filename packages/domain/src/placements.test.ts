@@ -130,6 +130,40 @@ describe("rescaleBuilding and unplaced plans", () => {
 	});
 });
 
+describe("Placements scaled but not aligned yet", () => {
+	it("are marked until the plan is aligned, and undo restores the mark", () => {
+		const before = building();
+		const scaled = applyOk(before, {
+			type: "placeUnderlay",
+			levelId: "f1",
+			placement: { ...plan, scale: 0.08 },
+			aligned: false,
+		});
+		expect(scaled.draft.unaligned).toEqual({ f1: true });
+
+		const placed = applyOk(scaled.draft, {
+			type: "placeUnderlay",
+			levelId: "f1",
+			placement: aligned,
+		});
+		expect(placed.draft.unaligned).toEqual({});
+		expect(applyOk(placed.draft, placed.inverse).draft).toEqual(scaled.draft);
+		expect(applyOk(scaled.draft, scaled.inverse).draft).toEqual(before);
+	});
+
+	it("removing a Level takes the mark with it, and undo brings it back", () => {
+		const scaled = run(building(), {
+			type: "placeUnderlay",
+			levelId: "f1",
+			placement: plan,
+			aligned: false,
+		});
+		const removed = applyOk(scaled, { type: "removeLevel", id: "f1" });
+		expect(removed.draft.unaligned).toEqual({});
+		expect(applyOk(removed.draft, removed.inverse).draft).toEqual(scaled);
+	});
+});
+
 describe("Placements and Levels", () => {
 	it("removing a Level removes its Placement, and undo brings it back", () => {
 		const before = building();
@@ -145,6 +179,7 @@ describe("parseOperation for Placements", () => {
 		const operations: Operation[] = [
 			{ type: "placeUnderlay", levelId: "g", placement: aligned },
 			{ type: "placeUnderlay", levelId: "g", placement: null },
+			{ type: "placeUnderlay", levelId: "g", placement: plan, aligned: false },
 			{
 				type: "rescaleBuilding",
 				spaces: [unit("a", "g")],

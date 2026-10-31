@@ -44,20 +44,28 @@ describe("levelSetup", () => {
 		expect(levelSetup(draft, "g", { hasPlan: true })).toBe("ready");
 	});
 
-	it("asks for Alignment on other Levels with plans, once the scale is set", () => {
+	it("asks every other plan for its own scale, then Alignment", () => {
 		const draft = run(twoLevels(), setScaleOnGround);
-		expect(levelSetup(draft, "f1", { hasPlan: true })).toBe("align");
 		expect(levelSetup(draft, "f1", { hasPlan: false })).toBe("ready");
+		expect(levelSetup(draft, "f1", { hasPlan: true })).toBe("setScale");
 
-		const aligned = run(draft, {
+		const scaled = run(draft, {
 			type: "placeUnderlay",
 			levelId: "f1",
-			placement,
+			placement: { ...placement, scale: 0.08 },
+			aligned: false,
+		});
+		expect(levelSetup(scaled, "f1", { hasPlan: true })).toBe("align");
+
+		const aligned = run(scaled, {
+			type: "placeUnderlay",
+			levelId: "f1",
+			placement: { scale: 0.08, rotation: 0.1, x: 3, y: 4 },
 		});
 		expect(levelSetup(aligned, "f1", { hasPlan: true })).toBe("ready");
 	});
 
-	it("keeps the scale set when it was set on a blank grid", () => {
+	it("keeps the Building's scale when it was set on a blank grid", () => {
 		const draft = run(twoLevels(), {
 			type: "rescaleBuilding",
 			spaces: [],
@@ -65,17 +73,17 @@ describe("levelSetup", () => {
 			scaleSet: true,
 		});
 		expect(draft.scaleSet).toBe(true);
-		// A plan uploaded later is aligned, not scaled again.
-		expect(levelSetup(draft, "f1", { hasPlan: true })).toBe("align");
+		// A plan uploaded later still has its own scale set, then is aligned.
+		expect(levelSetup(draft, "f1", { hasPlan: true })).toBe("setScale");
 	});
 
-	it("asks again after the plan's Placement is cleared (a new upload)", () => {
+	it("starts again after the plan's Placement is cleared (a new upload)", () => {
 		const draft = run(twoLevels(), setScaleOnGround, {
 			type: "placeUnderlay",
 			levelId: "g",
 			placement: null,
 		});
-		expect(levelSetup(draft, "g", { hasPlan: true })).toBe("align");
+		expect(levelSetup(draft, "g", { hasPlan: true })).toBe("setScale");
 	});
 });
 

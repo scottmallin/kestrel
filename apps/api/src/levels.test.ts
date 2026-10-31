@@ -65,6 +65,7 @@ describe("Levels", () => {
 				},
 				placements: {},
 				scaleSet: false,
+				unaligned: {},
 				spaces: {},
 				listings: {},
 			},

@@ -20,6 +20,7 @@ const withListings = (spaces: Space[], ...listings: Listing[]): Draft => ({
 	levels: { L0: level },
 	placements: {},
 	scaleSet: false,
+	unaligned: {},
 	spaces: Object.fromEntries(spaces.map((s) => [s.id, s])),
 	listings: Object.fromEntries(listings.map((l) => [l.id, l])),
 });

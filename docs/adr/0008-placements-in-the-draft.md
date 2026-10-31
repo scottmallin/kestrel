@@ -32,10 +32,10 @@ ADR 0007 kept scale and Alignment outside the Draft. Then a rescale would be hal
 
 ## Amendment (2026-10-31): set up a Level before drawing on it
 
-Drawing over a plan before it was scaled or aligned left Spaces stranded when the plan later moved (Align moves the plan, not the Spaces traced on it). So:
+Drawing over a plan before it was scaled or aligned left Spaces stranded when the plan later moved (Align moves the plan, not the Spaces traced on it). And plans are rarely drawn at the same scale as each other, so each needs its own. So:
 
-- **The Building's scale is set once**, on any Level: on a plan, or by measuring Spaces on a blank grid. The Draft records it (`scaleSet`, carried by `rescaleBuilding`, whose result it is), and it applies to every Level.
-- **A Level with a plan is locked for drawing until its plan is placed.** The next step is Set scale while the Building's scale isn't set, and Align plan after that. Levels without a plan (a blank grid) can always be drawn on: they're on the plane by default.
-- **Align needs the scale set.** Its ghost shows the reference Level's plan as well as its Spaces.
-- **Set scale places only the plan it was measured on** (when it's the first), and rescales every Placement that exists. Other unplaced plans stay unplaced, their Levels locked, until aligned.
-- **Re-uploading a plan clears its Placement**, so the Level locks until the new image is aligned (to its own Spaces, if it has any). Aligning never moves Spaces: with the lock, Spaces are only ever drawn on placed plans, so they're already right.
+- **Every plan gets its scale set; every plan but the first is then aligned.** A Level with a plan is locked for drawing until then. Levels without a plan (a blank grid) can always be drawn on: they're on the plane by default.
+- **The first scale set is the Building's**, on a plan or by measuring Spaces on a blank grid. It rescales everything (`rescaleBuilding`, which records `scaleSet`). So does setting the scale on a Level that's already set up: that corrects the whole Building.
+- **On a later plan, Set scale sets that plan's scale only**: `placeUnderlay` with `aligned: false`, recorded in the Draft's `unaligned`. Align then turns and moves it, keeping that scale (`alignAtScale`). If the two floors disagree about the distance between the matching points by more than 5%, Align refuses: a mis-click or a wrong scale.
+- **Align needs the plan's scale set.** Its ghost shows the reference Level's plan as well as its Spaces.
+- **Re-uploading a plan clears its Placement**, so the Level starts again: set its scale and align it (to its own Spaces, if it has any). Aligning never moves Spaces: with the lock, Spaces are only ever drawn on set-up plans, so they're already right.
