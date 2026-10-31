@@ -6,7 +6,6 @@ import type { AppDeps } from "../app.ts";
 import { embeds, publishedVersions, underlays } from "../db/schema.ts";
 import { loadDraft } from "../draft.ts";
 import { isImageUpload } from "../images.ts";
-import { DEFAULT_PIXELS_PER_METRE } from "../underlay.ts";
 import { findMapForUser } from "./access.ts";
 import { requireUser } from "./session.ts";
 
@@ -42,11 +41,14 @@ export const levelRoutes =
 				return {
 					id: map.id,
 					name: map.name,
-					// The Levels themselves are in the Draft (ADR 0007).
+					// The Levels and the Placements are in the Draft (ADRs 0007, 0008). The version changes with
+					// each upload, so the editor can put it in the URL and the image can be cached forever.
 					underlays: Object.fromEntries(
 						underlayRows.map((u) => [
 							u.levelId,
-							{ pixelsPerMetre: u.pixelsPerMetre },
+							{
+								version: u.storageKey.slice(u.storageKey.lastIndexOf("-") + 1),
+							},
 						]),
 					),
 					published: latest
@@ -80,16 +82,12 @@ export const levelRoutes =
 				}
 				const storageKey = `organisations/${map.organizationId}/maps/${map.id}/levels/${levelId}/underlay-${randomUUID()}`;
 				await storage.put(storageKey, { bytes: request.body, contentType });
-				const values = {
-					storageKey,
-					pixelsPerMetre: DEFAULT_PIXELS_PER_METRE,
-				};
 				await db
 					.insert(underlays)
-					.values({ mapId: map.id, levelId, ...values })
+					.values({ mapId: map.id, levelId, storageKey })
 					.onConflictDoUpdate({
 						target: [underlays.mapId, underlays.levelId],
-						set: values,
+						set: { storageKey },
 					});
 				return reply.status(204).send();
 			},

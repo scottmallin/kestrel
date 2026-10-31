@@ -22,7 +22,7 @@ ADR 0007 kept scale and Alignment outside the Draft. Then a rescale would be hal
 - **`rescaleBuilding`** records its result (ADR 0004): every Space and every Placement as they end up. Setting the scale works out the factor from a drawn line and its real length, then scales the whole plane about its origin: every Space on every Level, and every Placement. Undo restores all of it in one step.
 - **A Level with an Underlay but no Placement** shows it at the old default (20 pixels per metre, no rotation, at the origin). Any plan can have its scale set; the first one usually does, and the others are then aligned to it.
 - **Placements are never published** (ADR 0003 amendment: the Underlay isn't either).
-- **Existing Underlays** get a Placement from their stored scale, added to every snapshot of their Map's Draft, so logs replay unchanged. The `pixels_per_metre` column goes.
+- **Existing Underlays need no data moved.** Every stored scale was the default 20 pixels per metre, which is exactly where an Underlay without a Placement is shown, so the `pixels_per_metre` column simply goes.
 
 ## Consequences
 

@@ -63,6 +63,7 @@ describe("Levels", () => {
 				levels: {
 					[groundId]: { id: groundId, name: "Ground floor", ordinal: 0 },
 				},
+				placements: {},
 				spaces: {},
 				listings: {},
 			},
@@ -130,7 +131,9 @@ describe("Underlays per Level", () => {
 		expect((await owner.upload(url, png, "image/png")).statusCode).toBe(204);
 
 		const details = (await owner.request("GET", `/api/maps/${map.id}`)).json();
-		expect(details.underlays).toEqual({ [first.id]: { pixelsPerMetre: 20 } });
+		expect(details.underlays).toEqual({
+			[first.id]: { version: expect.any(String) },
+		});
 		const served = await owner.request("GET", url);
 		expect(served.statusCode).toBe(200);
 		expect(served.rawPayload).toEqual(png);
@@ -171,6 +174,28 @@ describe("Publishing Levels", () => {
 				(f: { properties: { id: string } }) => f.properties.id,
 			),
 		).toEqual(["b"]);
+	});
+});
+
+describe("Placements (ADR 0008)", () => {
+	it("are saved with the Draft but never published", async () => {
+		const { owner, map, groundId, save, load, app } = await newMap();
+		const placement = { scale: 0.04, rotation: 0.25, x: 3, y: -2 };
+		expect(
+			(await save({ type: "placeUnderlay", levelId: groundId, placement }))
+				.statusCode,
+		).toBe(200);
+		expect((await load()).draft.placements).toEqual({ [groundId]: placement });
+
+		const { embedId } = (
+			await owner.request("POST", `/api/maps/${map.id}/publish`)
+		).json();
+		const bundle = await app.inject({
+			method: "GET",
+			url: `/api/public/embeds/${embedId}`,
+		});
+		expect(bundle.body).not.toContain("placement");
+		expect(bundle.body).not.toContain("0.04");
 	});
 });
 
