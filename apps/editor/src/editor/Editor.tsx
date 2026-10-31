@@ -1,4 +1,4 @@
-import type { Draft } from "@kestrel/domain";
+import { type Draft, levelSetup } from "@kestrel/domain";
 import { DEFAULT_PLACEMENT, findOverlaps, toPlane } from "@kestrel/geometry";
 import {
 	type CSSProperties,
@@ -29,6 +29,21 @@ import {
 	type Underlay,
 } from "./underlay.ts";
 import { useViewport } from "./useViewport.ts";
+
+/** Inputs that take no typing, so keyboard shortcuts still work while they have focus. */
+const NON_TEXT_INPUTS = new Set([
+	"checkbox",
+	"radio",
+	"range",
+	"button",
+	"submit",
+	"reset",
+	"file",
+	"color",
+]);
+
+/** Tools that draw or change Spaces: locked on a Level whose plan isn't set up yet (ADR 0008 amendment). */
+const DRAWING_TOOLS: readonly ToolName[] = ["box", "fill", "split", "pen"];
 
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
 	{ name: "box", label: "▭ Box", key: "B" },
@@ -129,6 +144,37 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		() => new Set(Object.keys(underlayDetails)),
 		[underlayDetails],
 	);
+	const hasPlan = underlayLevelIds.has(levelId);
+	const setup = levelSetup(history.draft, levelId, { hasPlan });
+	/** Why a tool can't be used on this Level right now, or null if it can. */
+	const blocked = (name: ToolName): string | null => {
+		if (DRAWING_TOOLS.includes(name) && setup === "setScale")
+			return "Set the scale of this Level's floor plan before drawing on it";
+		if (DRAWING_TOOLS.includes(name) && setup === "align")
+			return "Align this Level's floor plan before drawing on it";
+		if (name === "align" && !hasPlan)
+			return "Upload a floor plan for this Level first";
+		if (name === "align" && !history.draft.scaleSet)
+			return "Set the scale first, then align other floors to it";
+		if (name === "scale" && setup === "align")
+			return "The scale is already set: align this plan instead";
+		return null;
+	};
+	// A locked tool gives way to the Level's next setup step.
+	const activeTool: ToolName =
+		blocked(toolName) === null
+			? toolName
+			: setup === "setScale"
+				? "scale"
+				: setup === "align"
+					? "align"
+					: "box";
+	const latestBlocked = useRef(blocked);
+	latestBlocked.current = blocked;
+	// Make the setup step the chosen tool, so its confirmation stays on screen once the Level unlocks.
+	useEffect(() => {
+		if (activeTool !== toolName) setToolName(activeTool);
+	}, [activeTool, toolName]);
 
 	// Warn before leaving with edits that haven't reached the server.
 	useEffect(() => {
@@ -146,7 +192,12 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 			await api.uploadUnderlay(map.id, forLevel, await toUploadablePng(file));
 			// The new upload has a new version; switching to it loads the new image.
 			setUnderlayDetails((await api.getMap(map.id)).underlays);
-			setNotice(null);
+			// A new image may be framed differently, so it has to be aligned again (ADR 0008 amendment).
+			const { history, perform } = store.getState();
+			if (history.draft.placements[forLevel]) {
+				perform({ type: "placeUnderlay", levelId: forLevel, placement: null });
+				setNotice("New floor plan uploaded: align it before drawing on it.");
+			} else setNotice(null);
 		} catch (e) {
 			setNotice(
 				`Couldn't use that floor plan: ${e instanceof Error ? e.message : String(e)}`,
@@ -244,6 +295,10 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		grid: gridOn ? GRID_METRES : undefined,
 		underlay,
 		underlayLevelIds,
+		underlayUrl: (id) => {
+			const version = underlayDetails[id]?.version;
+			return version ? api.underlayUrl(map.id, id, version) : null;
+		},
 	};
 	const tools = {
 		box: useBoxTool(ctx),
@@ -253,16 +308,17 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		scale: useScaleTool(ctx),
 		align: useAlignTool(ctx),
 	};
-	const tool = tools[toolName];
+	const tool = tools[activeTool];
 
 	const latestTool = useRef(tool);
 	latestTool.current = tool;
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
+			// Typing goes to text fields; anything else (a checkbox, a slider) keeps the shortcuts working.
 			const field = (e.target as HTMLElement).closest<HTMLElement>(
-				"input, textarea, select",
+				"input, textarea, select, [contenteditable]",
 			);
-			if (field) {
+			if (field && !NON_TEXT_INPUTS.has((field as HTMLInputElement).type)) {
 				// Esc leaves a text field, so shortcuts work again without reaching for the mouse.
 				if (e.key === "Escape") field.blur();
 				return;
@@ -281,7 +337,7 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 				setToolName("box");
 			} else {
 				const match = TOOLS.find((t) => t.key.toLowerCase() === key);
-				if (!match) return;
+				if (!match || latestBlocked.current(match.name)) return;
 				setToolName(match.name);
 			}
 			e.preventDefault();
@@ -319,10 +375,11 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 						<button
 							key={t.name}
 							type="button"
-							aria-pressed={toolName === t.name}
-							style={toolButton(toolName === t.name)}
+							aria-pressed={activeTool === t.name}
+							style={toolButton(activeTool === t.name)}
 							onClick={() => setToolName(t.name)}
-							title={`${t.label} (${t.key})`}
+							disabled={blocked(t.name) !== null}
+							title={blocked(t.name) ?? `${t.label} (${t.key})`}
 						>
 							{t.label}
 						</button>
@@ -420,7 +477,13 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 					· Scroll to zoom · hold Space and drag to pan · Ctrl+Z undo
 				</span>
 			</div>
-			<LevelPanel store={store} draft={draft} levelId={levelId} />
+			<LevelPanel
+				store={store}
+				draft={draft}
+				levelId={levelId}
+				underlayLevelIds={underlayLevelIds}
+				onChooseTool={setToolName}
+			/>
 			<div
 				ref={canvasArea}
 				style={{ overflow: "hidden", position: "relative" }}

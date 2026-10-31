@@ -30,6 +30,8 @@ export type ToolContext = {
 	readonly underlay: Underlay | null;
 	/** Levels that have a floor plan uploaded, placed or not. */
 	readonly underlayLevelIds: ReadonlySet<string>;
+	/** Where to load a Level's floor plan image from, or null if it has none. */
+	readonly underlayUrl: (levelId: string) => string | null;
 };
 
 /** What the active tool contributes to the canvas and how it reacts to input. */

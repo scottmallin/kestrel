@@ -37,7 +37,7 @@ Working record of product and stack decisions from design sessions. Use GLOSSARY
 
 1. Sign up, which creates an Organisation and its first Map.
 2. Upload an Underlay (image or PDF; pick the page for multi-page PDFs), or start on a blank grid.
-3. Set the scale with a known measurement. Can be skipped (estimated scale, with a reminder later).
+3. Set the scale with a known measurement. Required before drawing over a plan (ADR 0008 amendment); a blank grid can be drawn on straight away and scaled later.
 4. Trace Spaces, with an interactive tutorial for the first three.
 5. Name Spaces and place Amenities.
 6. Publish, then copy the embed code, with a preview on a sample web page.

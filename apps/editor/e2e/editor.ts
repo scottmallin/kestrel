@@ -82,6 +82,20 @@ export async function openEditor(
 				.getByRole("toolbar", { name: "Drawing tools" })
 				.getByRole("button", { name }),
 	};
+	if (samplePlan) {
+		// A plan locks drawing until the scale is set (ADR 0008 amendment). Measure 10 m as 10 m, so the plan
+		// keeps its default 20 px per metre and the coordinates above stay true.
+		const gridBox = page.getByLabel("Snap to 0.5 m grid");
+		if (!grid) await gridBox.check();
+		await page.keyboard.press("k");
+		await editor.click({ x: 0, y: 0 });
+		await editor.click({ x: 10, y: 0 });
+		await page.getByLabel("Real length in metres").fill("10");
+		await page.getByLabel("Real length in metres").press("Enter");
+		await expect(editor.status).toContainText("Scale set");
+		if (!grid) await gridBox.uncheck();
+		await page.keyboard.press("Escape");
+	}
 	return editor;
 }
 

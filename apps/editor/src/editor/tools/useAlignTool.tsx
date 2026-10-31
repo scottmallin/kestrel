@@ -6,10 +6,11 @@ import {
 	toImage,
 	toPlane,
 } from "@kestrel/geometry";
-import { useState } from "react";
-import { Circle, Group, Line, Text } from "react-konva";
+import { useEffect, useState } from "react";
+import { Circle, Group, Image as KonvaImage, Line, Text } from "react-konva";
 import { SnapMarker } from "../shapes.tsx";
 import { outlinesOf, type Tool, type ToolContext } from "../tool.ts";
+import { loadUnderlayImage } from "../underlay.ts";
 
 /** The ghost of the Level being aligned to, and the points picked on it. */
 const GHOST = "#c026d3";
@@ -21,10 +22,18 @@ const PLAN = "#1d4fc4";
  * of a lift shaft. Click a point on the plan, then the same point on the ghost of the other Level; twice.
  */
 export function useAlignTool(ctx: ToolContext): Tool {
-	const { draft, store, scale, tolerance, levelId, underlay } = ctx;
-	// Levels with Spaces to align to, nearest floor first. A Level can align its own new plan to its Spaces.
+	const { draft, store, scale, tolerance, levelId, underlay, underlayUrl } =
+		ctx;
+	const hasSpaces = (id: string) =>
+		Object.values(draft.spaces).some((s) => s.levelId === id);
+	// Levels to align to, nearest floor first: others with Spaces or a placed plan, and this Level's own
+	// Spaces (for a replaced plan).
 	const candidates = Object.values(draft.levels)
-		.filter((l) => Object.values(draft.spaces).some((s) => s.levelId === l.id))
+		.filter((l) =>
+			l.id === levelId
+				? hasSpaces(l.id)
+				: hasSpaces(l.id) || draft.placements[l.id] !== undefined,
+		)
 		.sort(
 			(a, b) =>
 				Number(a.id === levelId) - Number(b.id === levelId) ||
@@ -43,6 +52,25 @@ export function useAlignTool(ctx: ToolContext): Tool {
 	const [done, setDone] = useState<string | null>(null);
 
 	const ghostOutlines = reference ? outlinesOf(draft, reference.id) : [];
+	// The other Level's plan, faintly, where it's placed: matching plan to plan is easiest.
+	const ghostPlacement =
+		reference && reference.id !== levelId
+			? draft.placements[reference.id]
+			: undefined;
+	const ghostUrl =
+		ghostPlacement && reference ? underlayUrl(reference.id) : null;
+	const [ghostImage, setGhostImage] = useState<HTMLImageElement | null>(null);
+	useEffect(() => {
+		setGhostImage(null);
+		if (!ghostUrl) return;
+		let current = true;
+		void loadUnderlayImage(ghostUrl).then((image) => {
+			if (current) setGhostImage(image);
+		});
+		return () => {
+			current = false;
+		};
+	}, [ghostUrl]);
 	const pickingGhost = onPlan.length > onGhost.length;
 	const reset = () => {
 		setOnPlan([]);
@@ -67,9 +95,13 @@ export function useAlignTool(ctx: ToolContext): Tool {
 		return {
 			hint: "Upload a floor plan for this Level first, then align it to another Level",
 		};
+	if (!draft.scaleSet)
+		return {
+			hint: "Set the scale first (on any Level), then align other floors to it",
+		};
 	if (!reference)
 		return {
-			hint: "Draw some Spaces on another Level first (or set the scale on this plan), then align to them",
+			hint: "Nothing to align to yet: set the scale on another Level's plan, or draw Spaces on another Level first",
 		};
 
 	const step = onPlan.length + onGhost.length;
@@ -103,6 +135,18 @@ export function useAlignTool(ctx: ToolContext): Tool {
 		),
 		overlay: (
 			<>
+				{ghostImage && ghostPlacement && (
+					<KonvaImage
+						image={ghostImage}
+						x={ghostPlacement.x}
+						y={ghostPlacement.y}
+						rotation={(ghostPlacement.rotation * 180) / Math.PI}
+						scaleX={ghostPlacement.scale}
+						scaleY={ghostPlacement.scale}
+						opacity={0.3}
+						listening={false}
+					/>
+				)}
 				{reference.id !== levelId && (
 					<Group listening={false} opacity={0.75}>
 						{ghostOutlines.map((outline) => (

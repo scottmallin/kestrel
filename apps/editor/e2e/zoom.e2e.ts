@@ -18,3 +18,21 @@ test("switching tools keeps your zoom, even when the toolbar grows", async ({
 		await expect(editor.canvas).toHaveAttribute("data-scale", zoomed ?? "");
 	}
 });
+
+test("shortcuts still work after ticking a checkbox or moving a slider", async ({
+	page,
+}) => {
+	await openEditor(page, { samplePlan: false });
+	const toolButton = (name: RegExp) =>
+		page
+			.getByRole("toolbar", { name: "Drawing tools" })
+			.getByRole("button", { name });
+
+	await page.getByLabel("Snap to 0.5 m grid").check();
+	await page.keyboard.press("p");
+	await expect(toolButton(/Pen/)).toHaveAttribute("aria-pressed", "true");
+
+	await page.getByLabel("Plan opacity").focus();
+	await page.keyboard.press("b");
+	await expect(toolButton(/Box/)).toHaveAttribute("aria-pressed", "true");
+});

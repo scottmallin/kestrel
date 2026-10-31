@@ -51,13 +51,13 @@ export function useScaleTool(ctx: ToolContext): Tool {
 			setStatus("Type the line's real length in metres, above 0.");
 			return;
 		}
-		// Every Level with a plan: placed ones keep their place, unplaced ones are placed where they're shown.
+		// Placed plans scale with everything else. The plan measured on, if it's unplaced, is placed where it's
+		// shown; other unplaced plans stay unplaced, to be aligned (ADR 0008 amendment).
 		const placements: Record<string, Placement> = {};
-		for (const id of Object.keys(draft.levels)) {
-			const current = draft.placements[id];
-			if (current || underlayLevelIds.has(id))
-				placements[id] = scalePlacement(current ?? DEFAULT_PLACEMENT, factor);
-		}
+		for (const [id, current] of Object.entries(draft.placements))
+			placements[id] = scalePlacement(current, factor);
+		if (underlayLevelIds.has(levelId) && !draft.placements[levelId])
+			placements[levelId] = scalePlacement(DEFAULT_PLACEMENT, factor);
 		store.getState().perform({
 			type: "rescaleBuilding",
 			spaces: Object.values(draft.spaces).map((s) => ({
@@ -65,6 +65,7 @@ export function useScaleTool(ctx: ToolContext): Tool {
 				outline: scalePolygon(s.outline, factor),
 			})),
 			placements,
+			scaleSet: true,
 		});
 		setDone(
 			`Scale set: the line is now ${Number(length)} m, and everything else changed to match. Ctrl+Z undoes it.`,
