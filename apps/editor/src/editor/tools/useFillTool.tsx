@@ -4,7 +4,6 @@ import {
 	type Polygon,
 	type Snap,
 	snap,
-	traceRoom,
 	type WallMask,
 } from "@kestrel/geometry";
 import { useRef, useState } from "react";
@@ -18,8 +17,7 @@ import {
 } from "../tool.ts";
 import {
 	type ClosedOpening,
-	toMetres,
-	toPixels,
+	traceOnPlan,
 	type Underlay,
 	wallMaskFrom,
 } from "../underlay.ts";
@@ -74,19 +72,17 @@ export function useFillTool(ctx: ToolContext): Tool {
 			setStatus("Open a floor plan first: Magic fill reads the rooms from it.");
 			return;
 		}
-		const ppm = underlay.pixelsPerMetre;
-		const result = traceRoom(
-			wallMask(underlay),
-			{ x: point.x * ppm, y: point.y * ppm },
-			{ doorGap, occupied: outlinesOf(draft).map((o) => toPixels(o, ppm)) },
-		);
+		const result = traceOnPlan(wallMask(underlay), underlay.placement, point, {
+			doorGap,
+			occupied: outlinesOf(draft, ctx.levelId),
+		});
 		setStatus(result.ok ? null : result.reason);
-		setProposal(result.ok ? toMetres(result.outline, ppm) : null);
+		setProposal(result.ok ? result.outline : null);
 	};
 
 	const snapOpening = (p: Point, from?: Point) =>
 		snap(p, {
-			outlines: outlinesOf(draft),
+			outlines: outlinesOf(draft, ctx.levelId),
 			tolerance,
 			...(from && { drawing: [from] }),
 		});

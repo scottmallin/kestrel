@@ -18,6 +18,7 @@ const unit = (id: string, x: number, reference?: string): Space => ({
 const draftOf = (...spaces: Space[]): Draft => withListings(spaces);
 const withListings = (spaces: Space[], ...listings: Listing[]): Draft => ({
 	levels: { L0: level },
+	placements: {},
 	spaces: Object.fromEntries(spaces.map((s) => [s.id, s])),
 	listings: Object.fromEntries(listings.map((l) => [l.id, l])),
 });

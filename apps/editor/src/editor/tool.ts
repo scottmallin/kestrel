@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { EditorStore } from "./store.ts";
 import type { Underlay } from "./underlay.ts";
 
-export type ToolName = "box" | "fill" | "pen" | "split";
+export type ToolName = "box" | "fill" | "pen" | "split" | "scale" | "align";
 
 export type PointerInfo = {
 	/** Pointer position in metres. */
@@ -28,6 +28,8 @@ export type ToolContext = {
 	readonly tolerance: number;
 	readonly grid: number | undefined;
 	readonly underlay: Underlay | null;
+	/** Levels that have a floor plan uploaded, placed or not. */
+	readonly underlayLevelIds: ReadonlySet<string>;
 };
 
 /** What the active tool contributes to the canvas and how it reacts to input. */
@@ -48,7 +50,10 @@ export type Tool = {
 	onKeyDown?: (e: KeyboardEvent) => boolean;
 };
 
-export const outlinesOf = (draft: Draft) =>
-	Object.values(draft.spaces).map((s) => s.outline);
+/** Outlines of the Spaces on one Level: the only ones its tools snap to or fill around. */
+export const outlinesOf = (draft: Draft, levelId: string) =>
+	Object.values(draft.spaces)
+		.filter((s) => s.levelId === levelId)
+		.map((s) => s.outline);
 
 export const newSpaceId = () => crypto.randomUUID();

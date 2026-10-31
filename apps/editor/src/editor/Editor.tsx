@@ -1,5 +1,5 @@
 import type { Draft } from "@kestrel/domain";
-import { findOverlaps } from "@kestrel/geometry";
+import { DEFAULT_PLACEMENT, findOverlaps, toPlane } from "@kestrel/geometry";
 import {
 	type CSSProperties,
 	useEffect,
@@ -17,11 +17,17 @@ import { SidePanel } from "./SidePanel.tsx";
 import { createEditorStore } from "./store.ts";
 import { createDraftSync, type SyncStatus } from "./sync.ts";
 import type { ToolContext, ToolName } from "./tool.ts";
+import { useAlignTool } from "./tools/useAlignTool.tsx";
 import { useBoxTool } from "./tools/useBoxTool.tsx";
 import { useFillTool } from "./tools/useFillTool.tsx";
 import { usePenTool } from "./tools/usePenTool.tsx";
+import { useScaleTool } from "./tools/useScaleTool.tsx";
 import { useSplitTool } from "./tools/useSplitTool.tsx";
-import { loadUnderlay, toUploadablePng, type Underlay } from "./underlay.ts";
+import {
+	loadUnderlayImage,
+	toUploadablePng,
+	type Underlay,
+} from "./underlay.ts";
 import { useViewport } from "./useViewport.ts";
 
 const TOOLS: { name: ToolName; label: string; key: string }[] = [
@@ -29,6 +35,8 @@ const TOOLS: { name: ToolName; label: string; key: string }[] = [
 	{ name: "fill", label: "🪣 Magic fill", key: "F" },
 	{ name: "split", label: "✂ Split", key: "S" },
 	{ name: "pen", label: "✎ Pen", key: "P" },
+	{ name: "scale", label: "📏 Set scale", key: "K" },
+	{ name: "align", label: "📌 Align plan", key: "A" },
 ];
 
 /** Snapping reaches this far on screen, whatever the zoom. */
@@ -63,7 +71,9 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	/** Which Levels have a floor plan, and at what scale; updated as plans are uploaded. */
 	const [underlayDetails, setUnderlayDetails] = useState(map.underlays);
 	const [toolName, setToolName] = useState<ToolName>("box");
-	const [underlay, setUnderlay] = useState<Underlay | null>(null);
+	const [underlayImage, setUnderlayImage] = useState<HTMLImageElement | null>(
+		null,
+	);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [published, setPublished] = useState(
 		map.published && { version: map.published.version },
@@ -95,21 +105,30 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	};
 
 	// Each Level has its own floor plan; load the shown one's when switching Level.
-	const underlayInfo = underlayDetails[levelId];
+	const version = underlayDetails[levelId]?.version;
 	useEffect(() => {
-		setUnderlay(null);
-		if (!underlayInfo) return;
+		setUnderlayImage(null);
+		if (!version) return;
 		let current = true;
-		void loadUnderlay(
-			api.underlayUrl(map.id, levelId),
-			underlayInfo.pixelsPerMetre,
-		).then((loaded) => {
-			if (current) setUnderlay(loaded);
-		});
+		void loadUnderlayImage(api.underlayUrl(map.id, levelId, version)).then(
+			(image) => {
+				if (current) setUnderlayImage(image);
+			},
+		);
 		return () => {
 			current = false;
 		};
-	}, [map.id, levelId, underlayInfo]);
+	}, [map.id, levelId, version]);
+	// Where the plan sits comes from the Draft, so setting the scale or aligning can be undone (ADR 0008).
+	const placement = history.draft.placements[levelId] ?? DEFAULT_PLACEMENT;
+	const underlay = useMemo<Underlay | null>(
+		() => (underlayImage ? { image: underlayImage, placement } : null),
+		[underlayImage, placement],
+	);
+	const underlayLevelIds = useMemo(
+		() => new Set(Object.keys(underlayDetails)),
+		[underlayDetails],
+	);
 
 	// Warn before leaving with edits that haven't reached the server.
 	useEffect(() => {
@@ -125,14 +144,8 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		const forLevel = levelId;
 		try {
 			await api.uploadUnderlay(map.id, forLevel, await toUploadablePng(file));
-			const loaded = await loadUnderlay(
-				`${api.underlayUrl(map.id, forLevel)}?v=${Date.now()}`,
-			);
-			setUnderlayDetails((all) => ({
-				...all,
-				[forLevel]: { pixelsPerMetre: loaded.pixelsPerMetre },
-			}));
-			if (store.getState().levelId === forLevel) setUnderlay(loaded);
+			// The new upload has a new version; switching to it loads the new image.
+			setUnderlayDetails((await api.getMap(map.id)).underlays);
 			setNotice(null);
 		} catch (e) {
 			setNotice(
@@ -194,13 +207,24 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 	}, []);
 
 	const { fit } = viewport;
+	// Fit the plan whenever it's shown, rescaled or moved.
 	useEffect(() => {
-		if (underlay) {
-			fit(
-				underlay.image.naturalWidth / underlay.pixelsPerMetre,
-				underlay.image.naturalHeight / underlay.pixelsPerMetre,
-			);
-		}
+		if (!underlay) return;
+		const { image, placement } = underlay;
+		const corners = [
+			{ x: 0, y: 0 },
+			{ x: image.naturalWidth, y: 0 },
+			{ x: image.naturalWidth, y: image.naturalHeight },
+			{ x: 0, y: image.naturalHeight },
+		].map((p) => toPlane(placement, p));
+		const xs = corners.map((p) => p.x);
+		const ys = corners.map((p) => p.y);
+		fit({
+			minX: Math.min(...xs),
+			minY: Math.min(...ys),
+			maxX: Math.max(...xs),
+			maxY: Math.max(...ys),
+		});
 	}, [underlay, fit]);
 
 	const ctx: ToolContext = {
@@ -212,12 +236,15 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 		tolerance: SNAP_PIXELS / viewport.view.scale,
 		grid: gridOn ? GRID_METRES : undefined,
 		underlay,
+		underlayLevelIds,
 	};
 	const tools = {
 		box: useBoxTool(ctx),
 		fill: useFillTool(ctx),
 		split: useSplitTool(ctx),
 		pen: usePenTool(ctx),
+		scale: useScaleTool(ctx),
+		align: useAlignTool(ctx),
 	};
 	const tool = tools[toolName];
 

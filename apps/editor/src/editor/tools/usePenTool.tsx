@@ -17,7 +17,7 @@ export function usePenTool(ctx: ToolContext): Tool {
 
 	const snapAt = (p: Point) =>
 		snap(p, {
-			outlines: outlinesOf(draft),
+			outlines: outlinesOf(draft, ctx.levelId),
 			tolerance,
 			drawing: path,
 			...(grid && { grid }),

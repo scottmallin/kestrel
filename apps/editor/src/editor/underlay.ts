@@ -1,13 +1,20 @@
-import type { Point, Polygon, WallMask } from "@kestrel/geometry";
+import {
+	type Placement,
+	type Point,
+	type Polygon,
+	type TraceOptions,
+	type TraceResult,
+	toImage,
+	toPlane,
+	traceRoom,
+	type WallMask,
+} from "@kestrel/geometry";
 
-/** An uploaded plan shown under a Level. Its pixels map to metres via pixelsPerMetre. */
+/** An uploaded plan shown under a Level, and where it sits on the plane (ADR 0008). */
 export type Underlay = {
 	readonly image: HTMLImageElement;
-	readonly pixelsPerMetre: number;
+	readonly placement: Placement;
 };
-
-/** Until the scale-setting step exists, assume 20px per metre. */
-export const DEFAULT_PIXELS_PER_METRE = 20;
 
 /** Larger images are scaled down so filling and snapping stay fast. */
 const MAX_PIXELS = 2000;
@@ -19,13 +26,9 @@ async function decode(src: string): Promise<HTMLImageElement> {
 	return image;
 }
 
-/** Loads a saved Underlay (already at most MAX_PIXELS, as converted for upload). */
-export async function loadUnderlay(
-	src: string,
-	pixelsPerMetre = DEFAULT_PIXELS_PER_METRE,
-): Promise<Underlay> {
-	return { image: await decode(src), pixelsPerMetre };
-}
+/** Loads a saved Underlay's image (already at most MAX_PIXELS, as converted for upload). */
+export const loadUnderlayImage = (src: string): Promise<HTMLImageElement> =>
+	decode(src);
 
 /**
  * Converts any image the browser can read (PNG, JPEG, SVG…) into a PNG of at most MAX_PIXELS on a white
@@ -73,7 +76,7 @@ export function wallMaskFrom(
 	darkness: number,
 	openings: readonly ClosedOpening[],
 ): WallMask {
-	const { image, pixelsPerMetre } = underlay;
+	const { image, placement } = underlay;
 	const width = image.naturalWidth;
 	const height = image.naturalHeight;
 	const canvas = document.createElement("canvas");
@@ -88,8 +91,10 @@ export function wallMaskFrom(
 	g.lineWidth = 4;
 	for (const [a, b] of openings) {
 		g.beginPath();
-		g.moveTo(a.x * pixelsPerMetre, a.y * pixelsPerMetre);
-		g.lineTo(b.x * pixelsPerMetre, b.y * pixelsPerMetre);
+		const from = toImage(placement, a);
+		const to = toImage(placement, b);
+		g.moveTo(from.x, from.y);
+		g.lineTo(to.x, to.y);
 		g.stroke();
 	}
 	const { data } = g.getImageData(0, 0, width, height);
@@ -104,8 +109,23 @@ export function wallMaskFrom(
 	return { width, height, walls };
 }
 
-export const toPixels = (outline: Polygon, pixelsPerMetre: number): Polygon =>
-	outline.map((p) => ({ x: p.x * pixelsPerMetre, y: p.y * pixelsPerMetre }));
-
-export const toMetres = (outline: Polygon, pixelsPerMetre: number): Polygon =>
-	outline.map((p) => ({ x: p.x / pixelsPerMetre, y: p.y / pixelsPerMetre }));
+/**
+ * Magic fill on a placed plan: traces the room at `point` (metres on the plane) in the plan's pixels,
+ * treating `occupied` outlines (also on the plane) as walls, and returns the outline on the plane.
+ */
+export function traceOnPlan(
+	mask: WallMask,
+	placement: Placement,
+	point: Point,
+	options: TraceOptions = {},
+): TraceResult {
+	const toPixels = (outline: Polygon) =>
+		outline.map((p) => toImage(placement, p));
+	const result = traceRoom(mask, toImage(placement, point), {
+		...options,
+		...(options.occupied && { occupied: options.occupied.map(toPixels) }),
+	});
+	return result.ok
+		? { ok: true, outline: result.outline.map((p) => toPlane(placement, p)) }
+		: result;
+}
