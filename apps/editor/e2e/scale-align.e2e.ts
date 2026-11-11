@@ -141,3 +141,45 @@ test("another floor's plan gets its own scale, then is aligned, before drawing o
 	await expect(tool(page, /Box/)).toBeDisabled();
 	await expect(editor.status).toContainText("set its scale and align it");
 });
+
+test("a plan whose floors aren't drawn to one scale can be stretched to fit", async ({
+	page,
+}) => {
+	const editor = await openEditor(page, { grid: true, samplePlan: false });
+	await editor.drag({ x: 0, y: 0 }, { x: 20, y: 10 });
+	await setScale(page, editor, { x: 0, y: 0 }, { x: 20, y: 0 }, 20);
+	await page.keyboard.press("Escape");
+	await levelPanel(page).getByRole("button", { name: "+ Level above" }).click();
+	await page.getByRole("button", { name: "Use sample plan" }).click();
+	await expect(tool(page, /Set scale/)).toHaveAttribute("aria-pressed", "true");
+	// 0.1 m per pixel, as in the test above.
+	await editor.click({ x: 5, y: 5 });
+	await editor.click({ x: 15, y: 5 });
+	await page.getByLabel("Real length in metres").fill("20");
+	await page.getByLabel("Real length in metres").press("Enter");
+	await expect(editor.status).toContainText("Click a point on this plan");
+
+	// Pixels (100, 100) and (300, 100) are 20 m apart at this plan's scale, but 15 m apart on the ghost.
+	await editor.click({ x: 10, y: 10 });
+	await editor.click({ x: 0, y: 0 });
+	await editor.click({ x: 30, y: 10 });
+	await editor.click({ x: 15, y: 0 });
+	await expect(editor.status).toContainText("25% closer together");
+	await page.getByRole("button", { name: "Align anyway" }).click();
+	await expect(editor.status).toContainText("Plan stretched to fit");
+	await expect(page.getByRole("button", { name: "Align anyway" })).toHaveCount(
+		0,
+	);
+	await expect(tool(page, /Box/)).toBeEnabled();
+
+	// 15 m over 200 px, and pixel (100, 100) at (0, 0).
+	const draft = await savedDraft(page);
+	const levelOne = Object.values(draft.levels).find(
+		(l) => (l as { name: string }).name === "Level 1",
+	) as { id: string };
+	const placed = draft.placements[levelOne.id];
+	expect(placed.scale).toBeCloseTo(0.075, 2);
+	expect(placed.x).toBeCloseTo(-7.5, 0);
+	expect(placed.y).toBeCloseTo(-7.5, 0);
+	expect(draft.unaligned).toEqual({});
+});

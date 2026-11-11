@@ -1,6 +1,8 @@
 import {
 	alignAtScale,
+	type Placement,
 	type Point,
+	placementFromPairs,
 	type Snap,
 	snap,
 	toImage,
@@ -54,6 +56,11 @@ export function useAlignTool(ctx: ToolContext): Tool {
 	const [status, setStatus] = useState<string | null>(null);
 	/** What the last alignment did, shown as the hint until the next click. */
 	const [done, setDone] = useState<string | null>(null);
+	/**
+	 * Refused for disagreeing with the plan's scale: the alignment that stretches the plan to fit instead, for
+	 * posters whose floors aren't drawn to one scale. Offered until the next click.
+	 */
+	const [stretched, setStretched] = useState<Placement | null>(null);
 
 	const ghostOutlines = reference ? outlinesOf(draft, reference.id) : [];
 	// The other Level's plan, faintly, where it's placed: matching plan to plan is easiest.
@@ -82,6 +89,7 @@ export function useAlignTool(ctx: ToolContext): Tool {
 	const reset = () => {
 		setOnPlan([]);
 		setOnGhost([]);
+		setStretched(null);
 	};
 
 	const finish = (plan: Point[], ghost: Point[]) => {
@@ -99,16 +107,29 @@ export function useAlignTool(ctx: ToolContext): Tool {
 		}
 		if (Math.abs(result.mismatch) > MAX_MISMATCH) {
 			setStatus(
-				`Those points are ${Math.round(Math.abs(result.mismatch) * 100)}% ${result.mismatch > 0 ? "further apart" : "closer together"} on ${reference?.name} than on this plan at its scale. Check you picked matching points, or set this plan's scale again.`,
+				`Those points are ${Math.round(Math.abs(result.mismatch) * 100)}% ${result.mismatch > 0 ? "further apart" : "closer together"} on ${reference?.name} than on this plan at its scale. Check you picked matching points, or set this plan's scale again. If the floors just aren't drawn to the same scale (common on posters), choose Align anyway: it stretches this plan to fit, in place of its own scale.`,
+			);
+			setStretched(
+				placementFromPairs(plan as [Point, Point], ghost as [Point, Point]),
 			);
 			return;
 		}
-		store.getState().perform({
-			type: "placeUnderlay",
-			levelId,
-			placement: result.placement,
-		});
-		setDone(`Plan aligned to ${reference?.name}. Ctrl+Z undoes it.`);
+		place(result.placement, `Plan aligned to ${reference?.name}.`);
+	};
+
+	const place = (placement: Placement, message: string) => {
+		store.getState().perform({ type: "placeUnderlay", levelId, placement });
+		setDone(`${message} Ctrl+Z undoes it.`);
+	};
+
+	const alignAnyway = () => {
+		if (!stretched) return;
+		setStatus(null);
+		setStretched(null);
+		place(
+			stretched,
+			`Plan stretched to fit ${reference?.name}; its own scale was replaced.`,
+		);
 	};
 
 	if (!underlay)
@@ -170,6 +191,11 @@ export function useAlignTool(ctx: ToolContext): Tool {
 					/>{" "}
 					<Swatch colour={GHOST} /> Ghost of {reference.name}
 				</label>
+				{stretched && (
+					<button type="button" onClick={alignAnyway}>
+						Align anyway
+					</button>
+				)}
 			</>
 		),
 		overlay: (
@@ -237,6 +263,7 @@ export function useAlignTool(ctx: ToolContext): Tool {
 		onPointerDown({ point }) {
 			setStatus(null);
 			setDone(null);
+			setStretched(null);
 			if (pickingGhost) {
 				// Snap to the ghost's corners, where matching points usually are.
 				const p = snap(point, { outlines: ghostOutlines, tolerance }).point;
