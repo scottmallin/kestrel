@@ -122,7 +122,7 @@ export function LevelCanvas({
 				listening={false}
 			>
 				<Layer listening={false}>
-					{underlay && (
+					{underlay && !tool.hidePlan && (
 						<KonvaImage
 							image={underlay.image}
 							// Konva scales, then rotates, then moves: the same order as a Placement (ADR 0008).

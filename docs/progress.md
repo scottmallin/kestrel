@@ -98,7 +98,7 @@ pnpm e2e         # Playwright browser tests (25) in the installed Microsoft Edge
 - **Underlays are images only**; there's no PDF upload yet.
 - **Re-uploading a plan keeps its Placement**: if the new image is framed differently, set its scale or align it again (a Level can align to its own Spaces).
 - **Alignment clicks on the plan don't snap**: precision depends on zooming in. Snapping to dark wall corners on the plan would help.
-- **The ghost plan is hard to tell apart** from the plan being aligned: both are grey line drawings. Tint the ghost (e.g. magenta, like its Spaces).
+- **Align after the 2026-11-11 QA run**: the ghost plan is now drawn in magenta lines (paper transparent), the toolbar keys the blue and magenta points, and either plan can be hidden. Still to do: the 5% refusal leaves schematic posters, whose floors aren't drawn to one scale, with no way forward.
 - **Maps made before the setup rule** may have Spaces traced on a plan that was aligned later (Align moves the plan, not the Spaces). There's no tool to fix them; redraw or start a fresh Map.
 - **Undo can change a Level you can't see**: undoing an edit made on another floor applies it there without switching to it.
 - **Empty Levels are published**: a Level with no Spaces still appears in the Embed's switcher.

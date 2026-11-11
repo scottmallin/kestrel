@@ -10,13 +10,14 @@ import { useEffect, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Line, Text } from "react-konva";
 import { SnapMarker } from "../shapes.tsx";
 import { outlinesOf, type Tool, type ToolContext } from "../tool.ts";
-import { loadUnderlayImage } from "../underlay.ts";
+import { loadUnderlayImage, tintedLines } from "../underlay.ts";
 
 /** How far the two floors may disagree about the distance between the points (clicks aren't exact). */
 const MAX_MISMATCH = 0.05;
 
 /** The ghost of the Level being aligned to, and the points picked on it. */
 const GHOST = "#c026d3";
+const GHOST_RGB = { r: 0xc0, g: 0x26, b: 0xd3 };
 /** Points picked on the plan being aligned. */
 const PLAN = "#1d4fc4";
 
@@ -62,18 +63,21 @@ export function useAlignTool(ctx: ToolContext): Tool {
 			: undefined;
 	const ghostUrl =
 		ghostPlacement && reference ? underlayUrl(reference.id) : null;
-	const [ghostImage, setGhostImage] = useState<HTMLImageElement | null>(null);
+	// Tinted, so it can't be mistaken for the plan being aligned under it.
+	const [ghostImage, setGhostImage] = useState<HTMLCanvasElement | null>(null);
 	useEffect(() => {
 		setGhostImage(null);
 		if (!ghostUrl) return;
 		let current = true;
 		void loadUnderlayImage(ghostUrl).then((image) => {
-			if (current) setGhostImage(image);
+			if (current) setGhostImage(tintedLines(image, GHOST_RGB));
 		});
 		return () => {
 			current = false;
 		};
 	}, [ghostUrl]);
+	const [showPlan, setShowPlan] = useState(true);
+	const [showGhost, setShowGhost] = useState(true);
 	const pickingGhost = onPlan.length > onGhost.length;
 	const reset = () => {
 		setOnPlan([]);
@@ -122,36 +126,55 @@ export function useAlignTool(ctx: ToolContext): Tool {
 
 	const step = onPlan.length + onGhost.length;
 	const hints = [
-		"Click a point on this plan you can also find on the ghost, like a corner of the lift shaft",
-		`Now click the same point on the ghost of ${reference.name}`,
+		"Click a point on this plan you can also find on the magenta ghost, like a corner of the lift shaft",
+		`Now click the same point on the ghost of ${reference.name} (magenta)`,
 		"Click a second point on this plan, as far from the first as you can",
-		`Now click the same second point on the ghost of ${reference.name}`,
+		`Now click the same second point on the ghost of ${reference.name} (magenta)`,
 	];
 
 	return {
 		hint: (step === 0 && done) || hints[step] || "",
 		status,
+		hidePlan: !showPlan,
 		options: (
-			<label>
-				Align to{" "}
-				<select
-					value={reference.id}
-					onChange={(e) => {
-						setChosen(e.target.value);
-						reset();
-					}}
-				>
-					{candidates.map((l) => (
-						<option key={l.id} value={l.id}>
-							{l.id === levelId ? `${l.name} (this Level's Spaces)` : l.name}
-						</option>
-					))}
-				</select>
-			</label>
+			<>
+				<label>
+					Align to{" "}
+					<select
+						value={reference.id}
+						onChange={(e) => {
+							setChosen(e.target.value);
+							reset();
+						}}
+					>
+						{candidates.map((l) => (
+							<option key={l.id} value={l.id}>
+								{l.id === levelId ? `${l.name} (this Level's Spaces)` : l.name}
+							</option>
+						))}
+					</select>
+				</label>
+				<label>
+					<input
+						type="checkbox"
+						checked={showPlan}
+						onChange={(e) => setShowPlan(e.target.checked)}
+					/>{" "}
+					<Swatch colour={PLAN} /> This plan
+				</label>
+				<label>
+					<input
+						type="checkbox"
+						checked={showGhost}
+						onChange={(e) => setShowGhost(e.target.checked)}
+					/>{" "}
+					<Swatch colour={GHOST} /> Ghost of {reference.name}
+				</label>
+			</>
 		),
 		overlay: (
 			<>
-				{ghostImage && ghostPlacement && (
+				{showGhost && ghostImage && ghostPlacement && (
 					<KonvaImage
 						image={ghostImage}
 						x={ghostPlacement.x}
@@ -159,11 +182,11 @@ export function useAlignTool(ctx: ToolContext): Tool {
 						rotation={(ghostPlacement.rotation * 180) / Math.PI}
 						scaleX={ghostPlacement.scale}
 						scaleY={ghostPlacement.scale}
-						opacity={0.3}
+						opacity={0.6}
 						listening={false}
 					/>
 				)}
-				{reference.id !== levelId && (
+				{showGhost && reference.id !== levelId && (
 					<Group listening={false} opacity={0.75}>
 						{ghostOutlines.map((outline) => (
 							<Line
@@ -237,6 +260,23 @@ export function useAlignTool(ctx: ToolContext): Tool {
 			return true;
 		},
 	};
+}
+
+/** A Level's colour in the toolbar: the key to the markers and ghost on the canvas. */
+function Swatch({ colour }: { colour: string }) {
+	return (
+		<span
+			aria-hidden
+			style={{
+				display: "inline-block",
+				width: 10,
+				height: 10,
+				borderRadius: "50%",
+				background: colour,
+				verticalAlign: "middle",
+			}}
+		/>
+	);
 }
 
 function Marker({
