@@ -14,7 +14,7 @@ export function useSplitTool(ctx: ToolContext): Tool {
 	const { draft, store, tolerance, grid, scale } = ctx;
 	const [line, setLine] = useState<{ start: Point; end: Point } | null>(null);
 	const [hover, setHover] = useState<Snap | null>(null);
-	const outlines = outlinesOf(draft);
+	const outlines = outlinesOf(draft, ctx.levelId);
 
 	const snapAt = (p: Point, from?: Point) =>
 		snap(p, {

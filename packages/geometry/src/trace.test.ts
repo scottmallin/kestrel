@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { traceRoom, type WallMask } from "./trace.ts";
+import {
+	LEAKED,
+	suggestWallDarkness,
+	traceRoom,
+	type WallMask,
+} from "./trace.ts";
 
 /** A blank plan with helpers to draw walls (1 = wall) and knock doors through them. */
 function plan(width: number, height: number) {
@@ -58,6 +63,16 @@ describe("traceRoom", () => {
 		});
 	});
 
+	it("steps off a label or number to fill the room around it", () => {
+		const p = plan(100, 80);
+		p.room(10, 10, 60, 50);
+		p.wall(28, 28, 33, 32); // a number badge
+
+		const result = traceRoom(p.mask, { x: 30, y: 30 });
+
+		expect(result.ok && result.outline).toContainEqual({ x: 59, y: 49 });
+	});
+
 	it("rejects a click outside the plan", () => {
 		const p = plan(100, 80);
 		expect(traceRoom(p.mask, { x: -5, y: 30 })).toEqual({
@@ -78,9 +93,21 @@ describe("traceRoom", () => {
 		it("reports a leak when the fill escapes through a doorway", () => {
 			expect(traceRoom(withDoor().mask, { x: 30, y: 30 })).toEqual({
 				ok: false,
-				reason:
-					"The fill leaked out of the room. Raise the door gap, or close the opening.",
+				reason: LEAKED,
 			});
+		});
+
+		it("takes a narrow room as drawn when closing doorways would fill it", () => {
+			// A room 8px wide inside, with a 2px label across it: a door gap of 8 swells the walls and label
+			// until nothing is left to fill, so the room is filled as drawn.
+			const p = plan(100, 80);
+			p.room(10, 10, 21, 50);
+			p.wall(13, 30, 18, 31);
+
+			const result = traceRoom(p.mask, { x: 15, y: 20 }, { doorGap: 8 });
+
+			expect(result.ok && result.outline).toContainEqual({ x: 12, y: 12 });
+			expect(result.ok && result.outline).toContainEqual({ x: 20, y: 49 });
 		});
 
 		it("closes doorways no wider than the door gap", () => {
@@ -176,5 +203,34 @@ describe("traceRoom", () => {
 			ok: false,
 			reason: "That spot is already part of a Space.",
 		});
+	});
+});
+
+describe("suggestWallDarkness", () => {
+	/** A histogram from { luminance: share of pixels }. */
+	const histogram = (shares: Record<number, number>) => {
+		const h = new Array<number>(256).fill(0);
+		for (const [l, share] of Object.entries(shares))
+			h[Number(l)] = share * 10_000;
+		return h;
+	};
+
+	it("counts a poster's pale-grey walls, but not its paper or corridor fill", () => {
+		// White paper, light-grey corridors, grey walls (~175), dark number badges.
+		const darkness = suggestWallDarkness(
+			histogram({ 255: 0.6, 237: 0.3, 175: 0.05, 80: 0.05 }),
+		);
+		expect(darkness).toBeGreaterThan(175);
+		expect(darkness).toBeLessThan(237);
+	});
+
+	it("counts black walls on white paper", () => {
+		const darkness = suggestWallDarkness(histogram({ 255: 0.96, 17: 0.04 }));
+		expect(darkness).toBeGreaterThan(17);
+		expect(darkness).toBeLessThan(255);
+	});
+
+	it("falls back to a middling darkness when there's no light paper", () => {
+		expect(suggestWallDarkness(histogram({ 20: 0.9, 230: 0.04 }))).toBe(110);
 	});
 });

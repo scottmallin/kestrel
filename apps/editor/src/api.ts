@@ -2,8 +2,11 @@ import type { Draft, Operation } from "@kestrel/domain";
 import type { SaveResult } from "./editor/sync.ts";
 
 export type MapSummary = { id: string; name: string };
-/** A Level's floor plan; the Levels themselves are in the Draft (ADR 0007). */
-export type UnderlayDetails = { pixelsPerMetre: number };
+/** A Level's floor plan file. The Levels and Placements are in the Draft (ADRs 0007, 0008). */
+export type UnderlayDetails = {
+	/** Changes with each upload, so the image can be cached for good. */
+	version: string;
+};
 export type MapDetails = {
 	id: string;
 	name: string;
@@ -141,6 +144,6 @@ export const api = {
 		}),
 	logoUrl: (logoKey: string) => `/api/public/${logoKey}`,
 
-	underlayUrl: (mapId: string, levelId: string) =>
-		`/api/maps/${mapId}/levels/${levelId}/underlay`,
+	underlayUrl: (mapId: string, levelId: string, version?: string) =>
+		`/api/maps/${mapId}/levels/${levelId}/underlay${version ? `?v=${encodeURIComponent(version)}` : ""}`,
 };

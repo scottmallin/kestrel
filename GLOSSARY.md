@@ -81,6 +81,10 @@ _Avoid_: AI result, prediction, auto-trace
 An uploaded image or PDF of an existing plan, shown beneath a Level so its Spaces can be traced over it.
 _Avoid_: Background, trace image, template
 
+**Placement**:
+Where a Level's Underlay sits on its Building's plane: its scale, rotation and offset. Set by scale-setting or Alignment.
+_Avoid_: Transform, registration, position
+
 **Alignment**:
 Fitting a Level's Underlay to its Building's shared plane, done by pinning two matching points to an already-aligned Level.
 _Avoid_: Registration, calibration

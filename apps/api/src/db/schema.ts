@@ -5,7 +5,6 @@ import {
 	jsonb,
 	pgTable,
 	primaryKey,
-	real,
 	text,
 	timestamp,
 	uniqueIndex,
@@ -24,7 +23,7 @@ export const maps = pgTable("map", {
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-/** A Level's floor plan. Levels live in the Draft (ADR 0007); this row is editor-only and never published. */
+/** A Level's floor plan file. Levels and Placements live in the Draft (ADRs 0007, 0008); this is editor-only and never published. */
 export const underlays = pgTable(
 	"underlay",
 	{
@@ -33,7 +32,6 @@ export const underlays = pgTable(
 			.references(() => maps.id, { onDelete: "cascade" }),
 		levelId: text("level_id").notNull(),
 		storageKey: text("storage_key").notNull(),
-		pixelsPerMetre: real("pixels_per_metre").notNull(),
 	},
 	(t) => [primaryKey({ columns: [t.mapId, t.levelId] })],
 );

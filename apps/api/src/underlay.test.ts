@@ -25,13 +25,29 @@ describe("Underlay", () => {
 		expect(uploaded.statusCode).toBe(204);
 
 		const details = (await owner.request("GET", `/api/maps/${map.id}`)).json();
-		expect(details.underlays).toEqual({ [levelId]: { pixelsPerMetre: 20 } });
+		expect(details.underlays).toEqual({
+			[levelId]: { version: expect.any(String) },
+		});
 
 		const served = await owner.request("GET", url);
 		expect(served.statusCode).toBe(200);
 		expect(served.headers["content-type"]).toBe("image/png");
 		expect(served.rawPayload).toEqual(png);
 		expect(served.headers["x-content-type-options"]).toBe("nosniff");
+	});
+
+	it("gives each upload a new version, so a browser never shows a replaced plan from its cache", async () => {
+		const { owner, map, url } = await mapWithLevel();
+		const version = async () =>
+			Object.values(
+				(await owner.request("GET", `/api/maps/${map.id}`)).json().underlays,
+			)[0];
+
+		await owner.upload(url, png, "image/png");
+		const first = await version();
+		await owner.upload(url, png, "image/png");
+
+		expect(await version()).not.toEqual(first);
 	});
 
 	it("only accepts PNG, JPEG and WebP images", async () => {

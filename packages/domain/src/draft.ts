@@ -1,8 +1,15 @@
+import type { Placement } from "@kestrel/geometry";
 import type { Level, Listing, Space, SpaceKind } from "./index.ts";
 
 /** The editable working copy of a Map: its Levels, Spaces and Listings, by id. */
 export type Draft = {
 	readonly levels: Readonly<Record<string, Level>>;
+	/** Where each Level's Underlay sits on the plane, by Level id (ADR 0008). */
+	readonly placements: Readonly<Record<string, Placement>>;
+	/** Whether the Building's scale has been set, on any Level (ADR 0008 amendment). */
+	readonly scaleSet: boolean;
+	/** Levels whose plan has its own scale set but isn't aligned yet; other Placements are aligned. */
+	readonly unaligned: Readonly<Record<string, true>>;
 	readonly spaces: Readonly<Record<string, Space>>;
 	readonly listings: Readonly<Record<string, Listing>>;
 };
@@ -37,6 +44,10 @@ export type Operation =
 			readonly level: Level;
 			/** Spaces on the new Level, used when undoing its removal. */
 			readonly spaces?: readonly Space[];
+			/** Its Underlay's Placement, used when undoing its removal. */
+			readonly placement?: Placement;
+			/** Whether that Placement was still waiting to be aligned. */
+			readonly unaligned?: true;
 	  }
 	| {
 			readonly type: "updateLevel";
@@ -48,7 +59,24 @@ export type Operation =
 			/** New ordinals by Level id; Levels not listed keep theirs. */
 			readonly ordinals: Readonly<Record<string, number>>;
 	  }
-	| { readonly type: "removeLevel"; readonly id: string };
+	| { readonly type: "removeLevel"; readonly id: string }
+	| {
+			readonly type: "placeUnderlay";
+			readonly levelId: string;
+			/** null clears it, so the Underlay shows at the default Placement. */
+			readonly placement: Placement | null;
+			/** false when only the plan's own scale is set and it still needs aligning. Absent means aligned. */
+			readonly aligned?: boolean;
+	  }
+	| {
+			/** The result of scaling the whole plane (ADR 0008): Spaces and Placements as they end up. */
+			readonly type: "rescaleBuilding";
+			readonly spaces: readonly Space[];
+			/** null means the Level has no Placement (so undoing a rescale can take one away). */
+			readonly placements: Readonly<Record<string, Placement | null>>;
+			/** Whether the scale is set afterwards. Absent in Operations logged before it existed, meaning true. */
+			readonly scaleSet?: boolean;
+	  };
 
 export type LevelChanges = { readonly name?: string };
 
@@ -80,6 +108,9 @@ export type ApplyResult =
 
 export const emptyDraft = (): Draft => ({
 	levels: {},
+	placements: {},
+	scaleSet: false,
+	unaligned: {},
 	spaces: {},
 	listings: {},
 });
@@ -224,9 +255,24 @@ export function applyOperation(
 				};
 			const added = replace({ ...draft, levels }, [], spaces);
 			if (!added.ok) return added;
+			if (operation.placement) {
+				const invalid = checkPlacement(operation.placement);
+				if (invalid) return invalid;
+			}
 			return {
 				ok: true,
-				draft: added.draft,
+				draft: operation.placement
+					? {
+							...added.draft,
+							placements: {
+								...added.draft.placements,
+								[level.id]: operation.placement,
+							},
+							...(operation.unaligned && {
+								unaligned: { ...added.draft.unaligned, [level.id]: true },
+							}),
+						}
+					: added.draft,
 				inverse: { type: "removeLevel", id: level.id },
 			};
 		}
@@ -280,17 +326,105 @@ export function applyOperation(
 			);
 			const spaces = { ...draft.spaces };
 			for (const space of onLevel) delete spaces[space.id];
+			const { [level.id]: placement, ...placements } = draft.placements;
+			const { [level.id]: wasUnaligned, ...unaligned } = draft.unaligned;
 			return {
 				ok: true,
-				draft: { ...draft, levels, spaces },
+				draft: { ...draft, levels, spaces, placements, unaligned },
 				inverse: {
 					type: "addLevel",
 					level,
 					...(onLevel.length > 0 && { spaces: onLevel }),
+					...(placement && { placement }),
+					...(placement && wasUnaligned && { unaligned: true as const }),
+				},
+			};
+		}
+		case "placeUnderlay": {
+			const { levelId, placement } = operation;
+			if (!draft.levels[levelId])
+				return { ok: false, error: `No Level with id ${levelId}` };
+			if (placement) {
+				const invalid = checkPlacement(placement);
+				if (invalid) return invalid;
+			}
+			const { [levelId]: previous, ...others } = draft.placements;
+			const { [levelId]: wasUnaligned, ...stillUnaligned } = draft.unaligned;
+			const unaligned =
+				placement && operation.aligned === false
+					? { ...stillUnaligned, [levelId]: true as const }
+					: stillUnaligned;
+			return {
+				ok: true,
+				draft: {
+					...draft,
+					placements: placement ? { ...others, [levelId]: placement } : others,
+					unaligned,
+				},
+				inverse: {
+					type: "placeUnderlay",
+					levelId,
+					placement: previous ?? null,
+					...(previous && wasUnaligned && { aligned: false }),
+				},
+			};
+		}
+		case "rescaleBuilding": {
+			const spaces = { ...draft.spaces };
+			const previousSpaces: Space[] = [];
+			for (const space of operation.spaces) {
+				const existing = draft.spaces[space.id];
+				if (!existing)
+					return { ok: false, error: `No Space with id ${space.id}` };
+				if (existing.levelId !== space.levelId)
+					return {
+						ok: false,
+						error: `Space ${space.id} can't change Level while rescaling`,
+					};
+				if (space.outline.length < 3)
+					return {
+						ok: false,
+						error: `Space ${space.id} needs at least 3 corners`,
+					};
+				previousSpaces.push(existing);
+				spaces[space.id] = space;
+			}
+			const placements: Record<string, Placement> = { ...draft.placements };
+			const previousPlacements: Record<string, Placement | null> = {};
+			for (const [levelId, placement] of Object.entries(operation.placements)) {
+				if (!draft.levels[levelId])
+					return { ok: false, error: `No Level with id ${levelId}` };
+				if (placement) {
+					const invalid = checkPlacement(placement);
+					if (invalid) return invalid;
+				}
+				previousPlacements[levelId] = draft.placements[levelId] ?? null;
+				if (placement) placements[levelId] = placement;
+				else delete placements[levelId];
+			}
+			return {
+				ok: true,
+				draft: {
+					...draft,
+					spaces,
+					placements,
+					scaleSet: operation.scaleSet ?? true,
+				},
+				inverse: {
+					type: "rescaleBuilding",
+					spaces: previousSpaces,
+					placements: previousPlacements,
+					scaleSet: draft.scaleSet,
 				},
 			};
 		}
 	}
+}
+
+function checkPlacement(placement: Placement): ApplyResult | undefined {
+	if (!(placement.scale > 0))
+		return { ok: false, error: "A Placement's scale must be above 0" };
+	return undefined;
 }
 
 /** Checks the given Levels have a name and a whole-number ordinal no other Level has. */

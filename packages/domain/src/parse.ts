@@ -1,4 +1,4 @@
-import type { Point } from "@kestrel/geometry";
+import type { Placement, Point } from "@kestrel/geometry";
 import type { ListingChanges, Operation, SpaceChanges } from "./draft.ts";
 import {
 	type Level,
@@ -192,6 +192,37 @@ function ordinals(value: unknown): Record<string, number> {
 	return result;
 }
 
+/** Furthest a Placement may put a plan from the origin, in metres; far beyond any venue. */
+const PLACEMENT_LIMIT = 1_000_000;
+
+function placement(value: unknown, what: string): Placement {
+	const p = record(value, what);
+	for (const key of ["scale", "rotation", "x", "y"] as const) {
+		const n = p[key];
+		if (
+			typeof n !== "number" ||
+			!Number.isFinite(n) ||
+			Math.abs(n) > PLACEMENT_LIMIT
+		)
+			fail(`${what}.${key} must be a finite number`);
+	}
+	return {
+		scale: p.scale as number,
+		rotation: p.rotation as number,
+		x: p.x as number,
+		y: p.y as number,
+	};
+}
+
+function placements(value: unknown): Record<string, Placement | null> {
+	const p = record(value, "placements");
+	const result: Record<string, Placement | null> = {};
+	for (const [id, v] of Object.entries(p))
+		result[levelId(id, "placements key")] =
+			v === null ? null : placement(v, `placements.${id}`);
+	return result;
+}
+
 function operation(input: unknown): Operation {
 	const o = record(input, "Operation");
 	switch (o.type) {
@@ -233,6 +264,10 @@ function operation(input: unknown): Operation {
 			return {
 				type: "addLevel",
 				level: level(o.level),
+				...(o.placement !== undefined && {
+					placement: placement(o.placement, "placement"),
+				}),
+				...(o.unaligned === true && { unaligned: true as const }),
 				...(o.spaces !== undefined && {
 					spaces: Array.isArray(o.spaces)
 						? o.spaces.map((s, i) => space(s, `spaces[${i}]`))
@@ -255,6 +290,33 @@ function operation(input: unknown): Operation {
 			return { type: "reorderLevels", ordinals: ordinals(o.ordinals) };
 		case "removeLevel":
 			return { type: "removeLevel", id: string(o.id, "id") };
+		case "placeUnderlay":
+			return {
+				type: "placeUnderlay",
+				levelId: levelId(o.levelId, "levelId"),
+				placement:
+					o.placement === null ? null : placement(o.placement, "placement"),
+				...(o.aligned !== undefined && {
+					aligned:
+						typeof o.aligned === "boolean"
+							? o.aligned
+							: fail("aligned must be true or false"),
+				}),
+			};
+		case "rescaleBuilding":
+			return {
+				type: "rescaleBuilding",
+				spaces: Array.isArray(o.spaces)
+					? o.spaces.map((s, i) => space(s, `spaces[${i}]`))
+					: fail("spaces must be a list"),
+				placements: placements(o.placements),
+				...(o.scaleSet !== undefined && {
+					scaleSet:
+						typeof o.scaleSet === "boolean"
+							? o.scaleSet
+							: fail("scaleSet must be true or false"),
+				}),
+			};
 		default:
 			return fail(`Unknown Operation type ${JSON.stringify(o.type)}`);
 	}

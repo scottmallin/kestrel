@@ -36,14 +36,17 @@ export function useViewport(width: number, height: number) {
 		};
 	}, []);
 
-	/** Fits a width x height (metres) area into the canvas with a margin. */
+	/** Fits an area of the plane (metres) into the canvas with a margin. */
 	const fit = useCallback(
-		(w: number, h: number) => {
+		(area: { minX: number; minY: number; maxX: number; maxY: number }) => {
+			const w = area.maxX - area.minX;
+			const h = area.maxY - area.minY;
+			if (!(w > 0 && h > 0)) return;
 			const scale = Math.min(width / w, height / h) * 0.9;
 			setView({
 				scale,
-				x: (width - w * scale) / 2,
-				y: (height - h * scale) / 2,
+				x: (width - w * scale) / 2 - area.minX * scale,
+				y: (height - h * scale) / 2 - area.minY * scale,
 			});
 		},
 		[width, height],

@@ -125,8 +125,12 @@ export function LevelCanvas({
 					{underlay && (
 						<KonvaImage
 							image={underlay.image}
-							width={underlay.image.naturalWidth / underlay.pixelsPerMetre}
-							height={underlay.image.naturalHeight / underlay.pixelsPerMetre}
+							// Konva scales, then rotates, then moves: the same order as a Placement (ADR 0008).
+							x={underlay.placement.x}
+							y={underlay.placement.y}
+							rotation={(underlay.placement.rotation * 180) / Math.PI}
+							scaleX={underlay.placement.scale}
+							scaleY={underlay.placement.scale}
 							opacity={underlayOpacity}
 						/>
 					)}

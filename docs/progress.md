@@ -1,35 +1,37 @@
 # Progress: pick up here
 
-Last updated: 2026-10-29. Read this first when resuming work, then [GLOSSARY.md](../GLOSSARY.md) for the domain language, [roadmap.md](roadmap.md) for product decisions and [adr/](adr/) for architecture decisions.
+Last updated: 2026-10-31. Read this first when resuming work, then [GLOSSARY.md](../GLOSSARY.md) for the domain language, [roadmap.md](roadmap.md) for product decisions and [adr/](adr/) for architecture decisions.
 
 ## Where we are
 
 We're building the **alpha** (see Phases in the roadmap). Steps so far:
 
-| Step | What                                                                                    | Status                                |
-| ---- | --------------------------------------------------------------------------------------- | ------------------------------------- |
-| 1    | Operations and undo/redo in `packages/domain`                                           | ✅ Done (merged)                      |
-| 2    | Geometry in `packages/geometry`: snapping, split/merge/overlaps, Magic fill             | ✅ Done (merged)                      |
-| 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools  | ✅ Done (merged)                      |
-| 4    | Saving: sign-in, API, database, Underlay upload                                         | ✅ Done (merged)                      |
-| 5    | Publishing and the first Embed (ADR 0003 amendment)                                     | ✅ Done (merged)                      |
-| 6    | Listings and Categories, placed on the map, through to the Embed (ADR 0006)             | ✅ Done (merged)                      |
-| 7    | Levels: add, rename, reorder, delete and switch, in the editor and the Embed (ADR 0007) | ✅ Done on `feat/levels` (PR pending) |
+| Step | What                                                                                    | Status                                         |
+| ---- | --------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1    | Operations and undo/redo in `packages/domain`                                           | ✅ Done (merged)                               |
+| 2    | Geometry in `packages/geometry`: snapping, split/merge/overlaps, Magic fill             | ✅ Done (merged)                               |
+| 3    | The editor in `apps/editor`: Level canvas and the Box, Magic fill, Split and Pen tools  | ✅ Done (merged)                               |
+| 4    | Saving: sign-in, API, database, Underlay upload                                         | ✅ Done (merged)                               |
+| 5    | Publishing and the first Embed (ADR 0003 amendment)                                     | ✅ Done (merged)                               |
+| 6    | Listings and Categories, placed on the map, through to the Embed (ADR 0006)             | ✅ Done (merged)                               |
+| 7    | Levels: add, rename, reorder, delete and switch, in the editor and the Embed (ADR 0007) | ✅ Done (merged)                               |
+| 8    | Scale-setting and Alignment, and setting up each Level before drawing (ADR 0008)        | ✅ Done on `feat/scale-alignment` (PR pending) |
 
-The whole journey now works across several floors: draw each Level, place Listings (shops, departments) on the map, publish, paste one line, and Visitors can search a live map and switch floors. What comes next is open: see [Next](#next).
+The whole journey now works across several floors, with plans at their real scale and lined up: draw each Level, place Listings (shops, departments) on the map, publish, paste one line, and Visitors can search a live map and switch floors. What comes next is open: see [Next](#next).
 
 ## What's built
 
-**`packages/domain`**: a Draft holds Levels, Spaces and Listings. Operations (`addSpace`, `removeSpaces`, `replaceSpaces`, `reshapeSpace`, `updateSpace`, `addListing`, `updateListing`, `removeListing`, `addLevel`, `updateLevel`, `reorderLevels`, `removeLevel`) are applied to a Draft by `applyOperation`, which returns the new Draft plus the Operation that reverses it. `History` provides `perform` / `undo` / `redo` on top (ADR 0004). `parseOperation` checks that untrusted input is a well-formed Operation (including length limits and http(s)-only websites). Listings keep the ids of deleted Spaces, so undo restores placement (ADR 0006). Levels (ADR 0007): ordinals are floor numbers (0 is ground, basements negative, unique, gaps allowed); a Space must be on a Level that exists; `removeLevel` takes the Level's Spaces with it and its inverse is an `addLevel` carrying them back; a Map always keeps one Level. Level ids are restricted to `LEVEL_ID` (they go into storage keys).
+**`packages/domain`**: a Draft holds Levels, Spaces and Listings. Operations (`addSpace`, `removeSpaces`, `replaceSpaces`, `reshapeSpace`, `updateSpace`, `addListing`, `updateListing`, `removeListing`, `addLevel`, `updateLevel`, `reorderLevels`, `removeLevel`, `placeUnderlay`, `rescaleBuilding`) are applied to a Draft by `applyOperation`, which returns the new Draft plus the Operation that reverses it. `History` provides `perform` / `undo` / `redo` on top (ADR 0004). `parseOperation` checks that untrusted input is a well-formed Operation (including length limits and http(s)-only websites). Listings keep the ids of deleted Spaces, so undo restores placement (ADR 0006). Levels (ADR 0007): ordinals are floor numbers (0 is ground, basements negative, unique, gaps allowed); a Space must be on a Level that exists; `removeLevel` takes the Level's Spaces with it and its inverse is an `addLevel` carrying them back; a Map always keeps one Level. Level ids are restricted to `LEVEL_ID` (they go into storage keys). Placements (ADR 0008): `draft.placements` says where each Level's Underlay sits on the plane; `placeUnderlay` sets or clears one (Alignment); `rescaleBuilding` records the result of scaling the whole plane, every Space and Placement (null clears one), so setting the scale is one undo step; it also records `scaleSet`, the Building's scale being set. Removing a Level removes its Placement; undo brings it back. `placeUnderlay` with `aligned: false` sets a later plan's own scale before it's aligned (listed in `draft.unaligned`). `levelSetup(draft, levelId, { hasPlan })` says what a Level needs before drawing: `ready` (a blank grid, or a plan that's scaled and aligned), `setScale` or `align` (ADR 0008 amendment).
 
 **`packages/geometry`**: everything is in metres except `traceRoom`, which works in Underlay pixels.
 - `snap`: close the shape, then corner, then edge, then 45°/90° angle plus alignment guides, then grid on whichever axes nothing else has fixed.
 - `splitOutline` (only cuts along the segment actually drawn), `mergeOutlines`, `findOverlaps`, `containsPoint`, `polygonArea`.
-- `traceRoom`: Magic fill on a wall/not-wall pixel grid, covering door gaps, leak detection, tidying rough walls and treating Spaces already drawn as walls.
+- `Placement` (`placement.ts`): `plane = rotate(pixel × scale) + offset`, rotation clockwise as in Konva. `toPlane`/`toImage`, `placementFromPairs`, `alignAtScale` (Alignment keeping a plan's own scale, with the mismatch between floors), `rescaleFactor` with `scalePlacement`/`scalePolygon` (setting the scale), and `DEFAULT_PLACEMENT` (20 px/m at the origin, for unplaced plans).
+- `traceRoom`: Magic fill on a wall/not-wall pixel grid, covering door gaps, leak detection, tidying rough walls and treating Spaces already drawn as walls. Small marks (letters, number badges: clusters under 40 px) aren't thickened when closing door gaps, and a click on one steps off it; if closing door gaps leaves nothing to fill (a narrow unit with text in it), the room is taken as drawn. `suggestWallDarkness` picks the wall cut-off from a plan's histogram: lines clearly darker than its largest light areas (paper, corridor fills), so pale-grey poster walls count.
 
 **`apps/api`**: Fastify + Drizzle + Better Auth.
 - Auth at `/api/auth/*`: email and password, plus Organisations (each sign-up creates one). The auth tables in `src/db/auth-schema.ts` mirror Better Auth 1.7's `getAuthTables`; update them when upgrading.
-- `GET/POST /api/maps`, `GET /api/maps/:id` (with `underlays` by Level id; the Levels themselves come from the Draft). A new Map's Draft starts with a "Ground floor", stored as a snapshot at sequence 0 (ADR 0007).
+- `GET/POST /api/maps`, `GET /api/maps/:id` (with `underlays` by Level id, each with a `version` that changes on every upload so the image can be cached for good; Levels and Placements come from the Draft). A new Map's Draft starts with a "Ground floor", stored as a snapshot at sequence 0 (ADR 0007).
 - `GET/POST/PATCH/DELETE /api/categories`: per Organisation, unique ignoring case (ADR 0006).
 - `PUT /api/maps/:id/logos` stores a logo; `GET /api/public/logos/…` serves it to anyone. That route only ever serves logo keys, never floor plans or bundles.
 - `AppDeps.publicUrl` (`BASE_URL`) is where the API is publicly reachable, used for absolute logo URLs in bundles.
@@ -37,15 +39,16 @@ The whole journey now works across several floors: draw each Level, place Listin
 - `PUT/GET /api/maps/:mapId/levels/:levelId/underlay`, for any Level in the Draft, stored in the `underlay` table keyed by Map and Level id: PNG, JPEG or WebP only, served with `nosniff` and a sandboxing CSP. Files go through the `Storage` interface: memory in tests, `.data/files` in development.
 - `POST /api/maps/:id/publish` compiles the saved Draft into a new Published Version (stored through `Storage`) and creates the Map's first Embed if needed. `GET /api/public/embeds/:id` serves the latest bundle to anyone, cross-origin, cached for 60s.
 - Every route checks that the user belongs to the Map's Organisation (404 otherwise), except the public Embed route.
-- Database: real Postgres when `DATABASE_URL` is set; otherwise PGlite stored in `.data/pglite`; or entirely in memory with `KESTREL_EPHEMERAL=1` (browser tests). Migrations are in `drizzle/` and run on start. `0003_levels_in_draft` is hand-written (data moves into Drafts); its `meta/0003_snapshot.json` was edited by hand to match the schema, since drizzle-kit's custom migrations copy the previous snapshot.
+- Database: real Postgres when `DATABASE_URL` is set; otherwise PGlite stored in `.data/pglite`; or entirely in memory with `KESTREL_EPHEMERAL=1` (browser tests). Migrations are in `drizzle/` and run on start. `0003_levels_in_draft` is hand-written (data moves into Drafts); its `meta/0003_snapshot.json` was edited by hand to match the schema, since drizzle-kit's custom migrations copy the previous snapshot. `0004` drops `underlay.pixels_per_metre` (every stored scale was the default, which is where unplaced plans are shown).
 
 **`apps/editor`**: React + react-konva.
 - `App.tsx` / `screens.tsx`: sign in or sign up, then the Map picker, then the editor. The open Map is kept in the URL (`?map=…`).
 - `src/api.ts`: the API client.
 - `src/editor/sync.ts`: the save queue. It sends applied Operations in order, batching edits made during a save; goes offline and retries with backoff on network failure; stops on a conflict or rejection.
 - `src/editor/store.ts`: Zustand store over `History`, plus the Level being shown (`levelId`, `showLevel`; it opens on the floor closest to 0 and moves to the nearest floor if the shown Level goes away), the selection (only Spaces on that Level) and the last rejected Operation's error. It reports every applied Operation (including undo and redo) to the save queue, and checks Operations with `parseOperation` first, so one bad field can't stop saving.
-- `src/editor/tools/`: one hook per tool, `useBoxTool`, `useFillTool`, `useSplitTool` and `usePenTool`, all built on the `Tool` interface in `tool.ts`. Tools do their own hit-testing with geometry; Konva only draws.
-- `LevelPanel.tsx`: the column left of the canvas: floors highest first, + Level above/below, Rename, ↑/↓ (swaps floor numbers with the neighbour in one `reorderLevels`) and Delete with an inline warning (no browser dialogs).
+- `src/editor/tools/`: one hook per tool, `useBoxTool`, `useFillTool`, `useSplitTool`, `usePenTool`, `useScaleTool` (K: draw a line, type its real length; rescales every Space and plan) and `useAlignTool` (A: two points on the plan, then their matches on a dashed ghost of another Level's Spaces), all built on the `Tool` interface in `tool.ts`. Tools do their own hit-testing with geometry; Konva only draws. They only snap to and fill around Spaces on the Level shown (`outlinesOf(draft, levelId)`). Box, Magic fill, Split and Pen are disabled (with the reason as their tooltip) until the Level is set up, and the setup step becomes the active tool. Every plan gets its scale set, then every plan but the first is aligned; once a plan's scale is set the editor moves straight on to Align. Set scale rescales the whole Building the first time, or on a Level that's already set up; on a later plan it sets that plan's scale only. Align keeps the plan's scale, refuses if the floors disagree by over 5%, and its ghost shows the reference Level's plan as well as its Spaces. Re-uploading a plan clears its Placement, so the Level starts again. Keyboard shortcuts work unless focus is in a text field (checkboxes and sliders no longer swallow them).
+- `src/editor/underlay.ts`: an `Underlay` is the image plus its Placement from the Draft; `traceOnPlan` runs Magic fill through the Placement, so it works on rotated and offset plans. The canvas draws the plan with Konva's x/y/rotation/scale, and the view fits the placed plan whenever it's shown, rescaled or moved.
+- `LevelPanel.tsx`: the column left of the canvas: each floor shows its next setup step ("Set scale" / "Align plan"), and a Level that isn't ready shows a "Before drawing on this Level" checklist with a button for the step; floors highest first, + Level above/below, Rename, ↑/↓ (swaps floor numbers with the neighbour in one `reorderLevels`) and Delete with an inline warning (no browser dialogs).
 - `LevelCanvas.tsx`: zoom, pan, and mouse handling through native events, since they carry the real click count.
 - `PublishPanel.tsx`: after Publish (which waits for unsaved edits), the embed code with Copy and a link to the Embed. `VITE_EMBED_URL` says where the Embed is served (default `http://localhost:5174`).
 - `SidePanel.tsx`: Spaces and Listings tabs. A selected Space shows its Space Reference, Space Kind and the Listings "In this Space", with search-to-place or create-by-name. The Listing editor covers name, Category (created inline), logo, description, website and hours. The Listings tab has an Unplaced filter.
@@ -70,8 +73,8 @@ pnpm --filter @kestrel/editor dev        # editor at http://localhost:5173 → c
 pnpm --filter @kestrel/embed dev         # Embed at http://localhost:5174 (open it from Publish)
 pnpm check       # Biome lint + format (run `pnpm format` twice if imports were reordered)
 pnpm typecheck
-pnpm test        # Vitest unit tests (127)
-pnpm e2e         # Playwright browser tests (20) in the installed Microsoft Edge; starts its own API, editor and a production build of the Embed
+pnpm test        # Vitest unit tests (161)
+pnpm e2e         # Playwright browser tests (25) in the installed Microsoft Edge; starts its own API, editor and a production build of the Embed
 ```
 
 ## How we work
@@ -92,15 +95,18 @@ pnpm e2e         # Playwright browser tests (20) in the installed Microsoft Edge
 - **Accounts are minimal**: no email verification, password reset, invitations or Organisation switcher. Sign-in picks your first Organisation.
 - **A conflict loses unsaved edits**: the banner reloads the Map. That's fine for one editor at a time (ADR 0005).
 - **Cross-site request protection is untested**: Better Auth relaxes its Origin check under Vitest, so only the browser tests (and a manual curl check) exercise it.
-- **Scale is assumed** at 20 Underlay pixels = 1 m until the scale-setting step exists. The API stores `underlayPixelsPerMetre` ready for it.
 - **Underlays are images only**; there's no PDF upload yet.
-- **No Alignment yet**: every Level is drawn on the shared plane, but Underlays can't yet be pinned to the Level below, so a second floor's plan sits wherever its image lands.
+- **Re-uploading a plan keeps its Placement**: if the new image is framed differently, set its scale or align it again (a Level can align to its own Spaces).
+- **Alignment clicks on the plan don't snap**: precision depends on zooming in. Snapping to dark wall corners on the plan would help.
+- **The ghost plan is hard to tell apart** from the plan being aligned: both are grey line drawings. Tint the ghost (e.g. magenta, like its Spaces).
+- **Maps made before the setup rule** may have Spaces traced on a plan that was aligned later (Align moves the plan, not the Spaces). There's no tool to fix them; redraw or start a fresh Map.
 - **Undo can change a Level you can't see**: undoing an edit made on another floor applies it there without switching to it.
 - **Empty Levels are published**: a Level with no Spaces still appears in the Embed's switcher.
 - **Underlay rows outlive removed Levels** (deliberately, so undo brings the plan back). Nothing cleans them up yet.
-- **A replaced floor plan can come back from the browser cache**: the Underlay route is cached as immutable at a fixed URL, so after re-uploading, a reload may show the old plan until the cache clears. Version the URL (e.g. by storage key) to fix.
 - **Labels can collide**: Space labels sit at the centre of the bounding box, so they can overlap the plan's own text and fall outside L-shaped Spaces.
 - **Pressing inside an existing Space with the Box tool moves it** rather than starting a new box. This is intended, but worth watching in user testing.
+- **Magic fill's closed openings feel broken** (Scott, 2026-10-31): dragging in Magic fill draws a red line that closes a wide opening (like a shopfront) so the fill stays in the room. But it isn't apparent what the line is or does, it's the same red as the overlap warning, and undo doesn't remove it (it's tool state, not an Operation), so you're left with a red line you can't do anything with except "Clear closed openings" in the toolbar. To fix: a neutral colour with a "closed" label on each line; Backspace/Ctrl+Z inside Magic fill removes the last one; and say "1 opening closed · Clear" in the hint bar rather than only in the toolbar. Consider Shift-drag to draw one, if stray lines keep happening.
+- **Magic fill after the 2026-11-11 QA run (two-floor mall poster)**: Wall sensitivity is now automatic per plan (0 → 119 of 135 poster units fill first time), Door gap is in metres (default 2 m) and the leak message gives the right advice. Still to do: faint walls let neighbouring units merge; large logos still count as walls; fills always make a "unit"; Esc with no proposal switches to Box; settings reset on reload; tiny proposals aren't refused. A dashed wall made of short dashes isn't thickened by the door gap any more, so it may leak.
 - **Magic fill is slow on big plans**, because the wall grid is rebuilt when the darkness slider or closed openings change.
 - **The Embed is basic**: no Allowed Domains or Kiosk Mode, and its labels don't avoid each other, so small Spaces' labels can overlap.
 - **The Embed is heavy**: about 1.1 MB of JavaScript plus a 0.5 MB worker, almost all MapLibre. Fine for alpha; worth trimming before launch.
@@ -113,7 +119,6 @@ pnpm e2e         # Playwright browser tests (20) in the installed Microsoft Edge
 
 The alpha scope in the roadmap still needs, roughly in order:
 
-1. **Scale-setting and Alignment**, together: set the first Level's scale (draw a line, enter its length), replacing the 20 px/m assumption, then pin every other Level's Underlay to an aligned one by two matching points (ADR 0001 amendment). Both change only how an Underlay sits on the plane, never the Draft (ADR 0007).
-2. **Amenities**: icons at a point (Lucide, converted for MapLibre), including fire-safety ones and a Safety layer in the Embed.
-3. **Deployment** for alpha partners: hosting, Neon, the R2 adapter, the Embed on a CDN, and email for account recovery.
-4. **PDF Underlays**.
+1. **Amenities**: icons at a point (Lucide, converted for MapLibre), including fire-safety ones and a Safety layer in the Embed.
+2. **Deployment** for alpha partners: hosting, Neon, the R2 adapter, the Embed on a CDN, and email for account recovery.
+3. **PDF Underlays**.

@@ -35,7 +35,7 @@ export function useBoxTool(ctx: ToolContext): Tool {
 	const spaces = Object.values(draft.spaces);
 	const selected =
 		selection.length === 1 ? draft.spaces[selection[0] as string] : undefined;
-	const outlines = outlinesOf(draft);
+	const outlines = outlinesOf(draft, ctx.levelId);
 	const grab = (HANDLE_PIXELS / scale) * 1.2;
 
 	const handleAt = (p: Point) => {
