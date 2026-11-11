@@ -96,6 +96,38 @@ export function planHistogram(image: HTMLImageElement): number[] {
 	return histogram;
 }
 
+/**
+ * The plan's lines in one colour on a transparent background, so it can lie over another plan and still be
+ * told apart from it. Darker lines are more opaque; paper (near white) disappears.
+ */
+export function tintedLines(
+	image: HTMLImageElement,
+	colour: { r: number; g: number; b: number },
+): HTMLCanvasElement {
+	const width = image.naturalWidth;
+	const height = image.naturalHeight;
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	const g = canvas.getContext("2d", { willReadFrequently: true });
+	if (!g) throw new Error("Canvas is not available");
+	g.fillStyle = "#fff";
+	g.fillRect(0, 0, width, height);
+	g.drawImage(image, 0, 0);
+	const pixels = g.getImageData(0, 0, width, height);
+	const { data } = pixels;
+	for (let i = 0; i < width * height; i++) {
+		// Pale-grey poster walls (about 177) still come out strong.
+		const alpha = Math.min(255, Math.max(0, (250 - luminance(data, i)) * 3));
+		data[i * 4] = colour.r;
+		data[i * 4 + 1] = colour.g;
+		data[i * 4 + 2] = colour.b;
+		data[i * 4 + 3] = alpha;
+	}
+	g.putImageData(pixels, 0, 0);
+	return canvas;
+}
+
 /** Reads the Underlay's pixels into walls (dark pixels), adding any closed openings as walls. */
 export function wallMaskFrom(
 	underlay: Underlay,

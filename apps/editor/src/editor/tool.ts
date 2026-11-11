@@ -45,6 +45,8 @@ export type Tool = {
 	readonly options?: ReactNode;
 	/** Outlines shown in place of the stored ones while a gesture is in progress. */
 	readonly preview?: Readonly<Record<string, Polygon>>;
+	/** Hide this Level's floor plan, e.g. to see the ghost of another Level on its own while aligning. */
+	readonly hidePlan?: boolean;
 	onPointerDown?: (e: PointerInfo) => void;
 	onPointerMove?: (e: PointerInfo) => void;
 	onPointerUp?: (e: PointerInfo) => void;
