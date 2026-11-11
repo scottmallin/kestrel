@@ -8,7 +8,7 @@ import {
 	type WallMask,
 } from "@kestrel/geometry";
 import { useRef, useState } from "react";
-import { Line } from "react-konva";
+import { Group, Line, Text } from "react-konva";
 import { COLOURS, DraftOutline, SnapMarker } from "../shapes.tsx";
 import {
 	newSpaceId,
@@ -157,13 +157,20 @@ export function useFillTool(ctx: ToolContext): Tool {
 		overlay: (
 			<>
 				{openings.map(([a, b]) => (
-					<Line
-						key={`${a.x},${a.y},${b.x},${b.y}`}
-						points={[a.x, a.y, b.x, b.y]}
-						stroke={COLOURS.overlap}
-						strokeWidth={3 / scale}
-						listening={false}
-					/>
+					<Group key={`${a.x},${a.y},${b.x},${b.y}`} listening={false}>
+						<Line
+							points={[a.x, a.y, b.x, b.y]}
+							stroke={COLOURS.closedOpening}
+							strokeWidth={3 / scale}
+						/>
+						<Text
+							x={(a.x + b.x) / 2 + 4 / scale}
+							y={(a.y + b.y) / 2 + 4 / scale}
+							text="closed"
+							fontSize={11 / scale}
+							fill={COLOURS.closedOpening}
+						/>
+					</Group>
 				))}
 				{stroke && (
 					<Line
@@ -173,7 +180,7 @@ export function useFillTool(ctx: ToolContext): Tool {
 							stroke.end.x,
 							stroke.end.y,
 						]}
-						stroke={COLOURS.overlap}
+						stroke={COLOURS.closedOpening}
 						strokeWidth={3 / scale}
 						dash={[6 / scale, 4 / scale]}
 						listening={false}

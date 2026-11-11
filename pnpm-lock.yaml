@@ -259,6 +259,9 @@ importers:
       "@kestrel/geometry":
         specifier: workspace:*
         version: link:../../packages/geometry
+      "@kestrel/publish":
+        specifier: workspace:*
+        version: link:../../packages/publish
       konva:
         specifier: ^10.9.0
         version: 10.9.0

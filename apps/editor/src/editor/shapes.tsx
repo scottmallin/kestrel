@@ -1,4 +1,4 @@
-import type { Space } from "@kestrel/domain";
+import type { Space, SpaceKind } from "@kestrel/domain";
 import {
 	type Overlap,
 	type Point,
@@ -6,11 +6,12 @@ import {
 	polygonArea,
 	type Snap,
 } from "@kestrel/geometry";
+import { SPACE_KIND_COLOURS } from "@kestrel/publish";
 import { Circle, Group, Line, Rect, Text } from "react-konva";
 
+/** Blue means selected and red means overlapping; Spaces are filled by Space Kind, as in the Embed. */
 export const COLOURS = {
-	space: "#3b6fd8",
-	spaceFill: "rgba(59,111,216,0.16)",
+	space: "#64748b",
 	selected: "#1d4fc4",
 	selectedFill: "rgba(59,111,216,0.34)",
 	draft: "#ea580c",
@@ -18,7 +19,14 @@ export const COLOURS = {
 	overlap: "#dc2626",
 	overlapFill: "rgba(220,38,38,0.4)",
 	label: "#1d3b78",
+	/** A line drawn across an opening so Magic fill stays in the room. */
+	closedOpening: "#334155",
 } as const;
+
+/** A fill colour made see-through enough to show the plan under it. */
+export const seeThrough = (hex: string) => `${hex}b3`;
+
+const kindFill = (kind: SpaceKind) => seeThrough(SPACE_KIND_COLOURS[kind]);
 
 const flat = (outline: Polygon) => outline.flatMap((p) => [p.x, p.y]);
 
@@ -64,7 +72,7 @@ export function SpaceShapes({
 						<Line
 							points={flat(outline)}
 							closed
-							fill={selected ? COLOURS.selectedFill : COLOURS.spaceFill}
+							fill={selected ? COLOURS.selectedFill : kindFill(space.kind)}
 							stroke={selected ? COLOURS.selected : COLOURS.space}
 							strokeWidth={(selected ? 3 : 2) / scale}
 						/>
@@ -125,7 +133,7 @@ const SNAP_COLOURS: Record<Snap["kind"], string> = {
 	corner: "#ea580c",
 	edge: "#ea580c",
 	angle: "#7c3aed",
-	align: "#db2777",
+	align: "#0d9488",
 	grid: "#64748b",
 	none: "#94a3b8",
 };
