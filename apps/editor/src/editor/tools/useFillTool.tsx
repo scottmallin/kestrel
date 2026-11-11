@@ -4,6 +4,7 @@ import {
 	type Polygon,
 	type Snap,
 	snap,
+	suggestWallDarkness,
 	type WallMask,
 } from "@kestrel/geometry";
 import { useRef, useState } from "react";
@@ -17,6 +18,7 @@ import {
 } from "../tool.ts";
 import {
 	type ClosedOpening,
+	planHistogram,
 	traceOnPlan,
 	type Underlay,
 	wallMaskFrom,
@@ -24,15 +26,21 @@ import {
 
 /** A press that moves further than this (screen pixels) draws an opening instead of filling. */
 const DRAG_PIXELS = 6;
+/** Doorways up to this wide (metres) are closed, if the room leaks without closing them. */
+const DOOR_GAP_METRES = 2;
 
 /**
  * Magic fill: click inside a room on the Underlay to propose its outline, then accept or reject it.
  * Drag across a wide opening (like a shopfront) to close it, so the fill stays in the room.
  */
+/** Wall darkness before a plan is open (it's suggested from the plan's pixels once it is). */
+const DEFAULT_DARKNESS = 110;
+
 export function useFillTool(ctx: ToolContext): Tool {
 	const { draft, store, underlay, tolerance, scale } = ctx;
-	const [doorGap, setDoorGap] = useState(40);
-	const [darkness, setDarkness] = useState(110);
+	const [doorGap, setDoorGap] = useState(DOOR_GAP_METRES);
+	// Null until the user moves the slider: then the darkness is suggested from each plan's own pixels.
+	const [chosenDarkness, setDarkness] = useState<number | null>(null);
 	const [openings, setOpenings] = useState<ClosedOpening[]>([]);
 	const [proposal, setProposal] = useState<Polygon | null>(null);
 	const [status, setStatus] = useState<string | null>(null);
@@ -41,6 +49,22 @@ export function useFillTool(ctx: ToolContext): Tool {
 		null,
 	);
 	const press = useRef<Point | null>(null);
+
+	// Read once per plan image: reading every pixel is slow.
+	const suggested = useRef<{
+		image: HTMLImageElement;
+		darkness: number;
+	} | null>(null);
+	const autoDarkness = (u: Underlay) => {
+		if (suggested.current?.image !== u.image)
+			suggested.current = {
+				image: u.image,
+				darkness: suggestWallDarkness(planHistogram(u.image)),
+			};
+		return suggested.current.darkness;
+	};
+	const darkness =
+		chosenDarkness ?? (underlay ? autoDarkness(underlay) : DEFAULT_DARKNESS);
 
 	// Built on first use, and rebuilt only when its inputs change: reading every pixel is slow.
 	const maskCache = useRef<{ inputs: unknown[]; mask: WallMask } | null>(null);
@@ -73,7 +97,7 @@ export function useFillTool(ctx: ToolContext): Tool {
 			return;
 		}
 		const result = traceOnPlan(wallMask(underlay), underlay.placement, point, {
-			doorGap,
+			doorGap: doorGap / underlay.placement.scale,
 			occupied: outlinesOf(draft, ctx.levelId),
 		});
 		setStatus(result.ok ? null : result.reason);
@@ -94,26 +118,33 @@ export function useFillTool(ctx: ToolContext): Tool {
 		status,
 		options: (
 			<>
-				<label title="Openings narrower than this are treated as closed">
-					Door gap {doorGap}px{" "}
+				<label title="If a room leaks through a doorway, openings up to this wide are closed">
+					Door gap {doorGap.toFixed(1)} m{" "}
 					<input
 						type="range"
 						min={0}
-						max={80}
+						max={5}
+						step={0.1}
 						value={doorGap}
 						onChange={(e) => setDoorGap(Number(e.target.value))}
 					/>
 				</label>
-				<label title="How dark a line must be to count as a wall">
-					Wall darkness{" "}
+				<label title="Higher counts paler lines as walls. Set automatically from the plan until you move it.">
+					Wall sensitivity {Math.round((darkness / 255) * 100)}%
+					{chosenDarkness === null && " (auto)"}{" "}
 					<input
 						type="range"
 						min={40}
-						max={220}
+						max={240}
 						value={darkness}
 						onChange={(e) => setDarkness(Number(e.target.value))}
 					/>
 				</label>
+				{chosenDarkness !== null && (
+					<button type="button" onClick={() => setDarkness(null)}>
+						Auto
+					</button>
+				)}
 				<button
 					type="button"
 					disabled={openings.length === 0}

@@ -7,6 +7,42 @@ export type WallMask = {
 	readonly walls: Uint8Array;
 };
 
+/**
+ * A Wall darkness (luminance, 0–255) for a plan, from its histogram (256 pixel counts by luminance): lines
+ * clearly darker than every large flat area of the plan (the paper, corridor and floor fills) count as walls.
+ * Mall posters draw walls in pale grey, which a fixed cut-off misses.
+ */
+export function suggestWallDarkness(histogram: ArrayLike<number>): number {
+	let total = 0;
+	for (let l = 0; l < 256; l++) total += histogram[l] ?? 0;
+	// Counted in a small window, so a fill that's slightly uneven (JPEG noise, gradients) still counts.
+	const share = (l: number) => {
+		let count = 0;
+		for (let i = Math.max(0, l - 2); i <= Math.min(255, l + 2); i++)
+			count += histogram[i] ?? 0;
+		return count / total;
+	};
+	for (let l = LIGHTEST_INK; l < 256; l++) {
+		if (share(l) >= FLAT_AREA_SHARE)
+			return Math.max(
+				MIN_DARKNESS,
+				Math.min(MAX_DARKNESS, Math.round(l * WALL_CONTRAST)),
+			);
+	}
+	return DEFAULT_DARKNESS;
+}
+
+/** A luminance shared by at least this much of the plan is a flat area (paper or a fill), not lines. */
+const FLAT_AREA_SHARE = 0.1;
+/** Flat areas darker than this are taken to be ink, not paper (e.g. a large dark logo). */
+const LIGHTEST_INK = 128;
+/** Walls must be at least this much darker than the darkest light flat area (as a fraction of its luminance). */
+const WALL_CONTRAST = 0.85;
+const MIN_DARKNESS = 60;
+const MAX_DARKNESS = 220;
+/** For plans with no light flat area, such as light lines on a dark background. */
+const DEFAULT_DARKNESS = 110;
+
 export type TraceResult =
 	| { readonly ok: true; readonly outline: Polygon }
 	| { readonly ok: false; readonly reason: string };
@@ -34,26 +70,126 @@ export function traceRoom(
 		return { ok: false, reason: "That spot is already part of a Space." };
 	}
 	const walls = withOccupied(mask, occupied);
-	if (walls[y * width + x]) {
-		return {
-			ok: false,
-			reason: "That spot is on a wall. Click further inside the room.",
-		};
+	let seedIndex = y * width + x;
+	if (walls[seedIndex]) {
+		// People click on a unit's name or number: step off a small mark, but not off a wall.
+		const off = isSmallMark(walls, width, height, seedIndex)
+			? nearestOpen(walls, width, height, x, y, MARK_REACH)
+			: undefined;
+		if (off === undefined)
+			return {
+				ok: false,
+				reason: "That spot is on a wall. Click further inside the room.",
+			};
+		seedIndex = off;
 	}
-	// Thicken walls by half the door gap so doorways close, fill, then grow back out to the real walls.
+	const sx = seedIndex % width;
+	const sy = Math.floor(seedIndex / width);
 	const radius = Math.round((options.doorGap ?? 0) / 2);
-	const blocked = radius > 0 ? dilate(walls, width, height, radius) : walls;
+	const closed = fillRoom(walls, width, height, sx, sy, radius);
+	// Closing doorways also swells text and badges, which can fill a narrow room; if it does, take the room as drawn.
+	if (closed.ok || radius === 0 || closed.reason === LEAKED) return closed;
+	return fillRoom(walls, width, height, sx, sy, 0);
+}
+
+/** A cluster of wall pixels that fits in a square this size (pixels) is a mark (a letter, a number badge), not a wall. */
+const MARK_SIZE = 40;
+/** How far (pixels) a click on a mark looks for the floor around it. */
+const MARK_REACH = 30;
+
+/** The walls with every small mark (letters, number badges) cleared. */
+function withoutMarks(
+	walls: Uint8Array,
+	width: number,
+	height: number,
+): Uint8Array {
+	const out = walls.slice();
+	const seen = new Uint8Array(width * height);
+	const queue = new Int32Array(width * height);
+	for (let start = 0; start < walls.length; start++) {
+		if (!walls[start] || seen[start]) continue;
+		let [head, tail] = [0, 0];
+		queue[tail++] = start;
+		seen[start] = 1;
+		let [left, right, top, bottom] = [width, 0, height, 0];
+		while (head < tail) {
+			const i = queue[head++] as number;
+			const x = i % width;
+			const y = (i - x) / width;
+			[left, right] = [Math.min(left, x), Math.max(right, x)];
+			[top, bottom] = [Math.min(top, y), Math.max(bottom, y)];
+			for (let dy = -1; dy <= 1; dy++) {
+				for (let dx = -1; dx <= 1; dx++) {
+					const nx = x + dx;
+					const ny = y + dy;
+					if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+					const j = ny * width + nx;
+					if (!walls[j] || seen[j]) continue;
+					seen[j] = 1;
+					queue[tail++] = j;
+				}
+			}
+		}
+		if (right - left < MARK_SIZE && bottom - top < MARK_SIZE)
+			for (let k = 0; k < tail; k++) out[queue[k] as number] = 0;
+	}
+	return out;
+}
+
+/** Whether the wall pixel at start is part of a small mark: a cluster of wall pixels not joined to the walls. */
+function isSmallMark(
+	walls: Uint8Array,
+	width: number,
+	height: number,
+	start: number,
+): boolean {
+	const seen = new Set<number>([start]);
+	const queue = [start];
+	let [left, right, top, bottom] = [width, 0, height, 0];
+	while (queue.length > 0) {
+		const i = queue.pop() as number;
+		const x = i % width;
+		const y = Math.floor(i / width);
+		[left, right] = [Math.min(left, x), Math.max(right, x)];
+		[top, bottom] = [Math.min(top, y), Math.max(bottom, y)];
+		if (right - left >= MARK_SIZE || bottom - top >= MARK_SIZE) return false;
+		for (let dy = -1; dy <= 1; dy++) {
+			for (let dx = -1; dx <= 1; dx++) {
+				const nx = x + dx;
+				const ny = y + dy;
+				if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+				const j = ny * width + nx;
+				if (!walls[j] || seen.has(j)) continue;
+				seen.add(j);
+				queue.push(j);
+			}
+		}
+	}
+	return true;
+}
+
+/** Fills from (x, y) with walls thickened by radius (closing doorways up to twice as wide), then grows back out. */
+function fillRoom(
+	walls: Uint8Array,
+	width: number,
+	height: number,
+	x: number,
+	y: number,
+	radius: number,
+): TraceResult {
+	// Only walls are thickened: thickening labels and badges would swell them across the room.
+	const blocked =
+		radius > 0
+			? dilate(withoutMarks(walls, width, height), width, height, radius).map(
+					(v, i) => v | (walls[i] as number),
+				)
+			: walls;
 	const start = nearestOpen(blocked, width, height, x, y, radius + 1);
 	if (start === undefined)
 		return { ok: false, reason: "Click further inside the room." };
 	const { region, size } = floodFill(blocked, width, height, start);
-	if (size > width * height * MAX_ROOM_SHARE) {
-		return {
-			ok: false,
-			reason:
-				"The fill leaked out of the room. Raise the door gap, or close the opening.",
-		};
-	}
+	if (size > width * height * MAX_ROOM_SHARE)
+		return { ok: false, reason: LEAKED };
 	const room =
 		radius > 0
 			? dilate(region, width, height, radius).map((v, i) => (walls[i] ? 0 : v))
@@ -66,6 +202,10 @@ export function traceRoom(
 		),
 	};
 }
+
+/** Pale walls are the usual cause of a leak on posters; an opening in the outline is the other. */
+export const LEAKED =
+	"The fill leaked out of the room. If the plan's walls are pale, raise Wall sensitivity; if there's an opening, drag across it to close it or raise the door gap.";
 
 /** The mask's walls plus every pixel whose centre lies inside an occupied outline. */
 function withOccupied(

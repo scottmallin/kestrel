@@ -70,6 +70,32 @@ export async function toUploadablePng(
 /** A line drawn across an opening (e.g. a shopfront) so Magic fill treats it as a wall. Metres. */
 export type ClosedOpening = readonly [Point, Point];
 
+const luminance = (data: Uint8ClampedArray, i: number) =>
+	0.299 * (data[i * 4] ?? 255) +
+	0.587 * (data[i * 4 + 1] ?? 255) +
+	0.114 * (data[i * 4 + 2] ?? 255);
+
+/** How many of the plan's pixels have each luminance (256 counts), for suggesting a Wall darkness. */
+export function planHistogram(image: HTMLImageElement): number[] {
+	const width = image.naturalWidth;
+	const height = image.naturalHeight;
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	const g = canvas.getContext("2d", { willReadFrequently: true });
+	if (!g) throw new Error("Canvas is not available");
+	g.fillStyle = "#fff";
+	g.fillRect(0, 0, width, height);
+	g.drawImage(image, 0, 0);
+	const { data } = g.getImageData(0, 0, width, height);
+	const histogram = new Array<number>(256).fill(0);
+	for (let i = 0; i < width * height; i++) {
+		const l = Math.round(luminance(data, i));
+		histogram[l] = (histogram[l] ?? 0) + 1;
+	}
+	return histogram;
+}
+
 /** Reads the Underlay's pixels into walls (dark pixels), adding any closed openings as walls. */
 export function wallMaskFrom(
 	underlay: Underlay,
@@ -100,11 +126,7 @@ export function wallMaskFrom(
 	const { data } = g.getImageData(0, 0, width, height);
 	const walls = new Uint8Array(width * height);
 	for (let i = 0; i < walls.length; i++) {
-		const luminance =
-			0.299 * (data[i * 4] ?? 255) +
-			0.587 * (data[i * 4 + 1] ?? 255) +
-			0.114 * (data[i * 4 + 2] ?? 255);
-		walls[i] = luminance < darkness ? 1 : 0;
+		walls[i] = luminance(data, i) < darkness ? 1 : 0;
 	}
 	return { width, height, walls };
 }
