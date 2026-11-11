@@ -33,6 +33,7 @@ body {
 	}
 }
 .map-area {
+	grid-area: 1 / 1;
 	position: relative;
 	min-height: 0;
 }
@@ -80,6 +81,7 @@ body {
 	outline-offset: 2px;
 }
 .directory {
+	grid-area: 2 / 1;
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
@@ -88,6 +90,7 @@ body {
 }
 @media (min-width: 720px) {
 	.directory {
+		grid-area: 1 / 2;
 		border-top: none;
 		border-left: 1px solid var(--line);
 	}
@@ -189,4 +192,51 @@ body {
 }
 .details p {
 	margin: 4px 0;
+}
+/* The key to the Space Kinds on the floor shown; collapsed, so it doesn't cover the map on phones. */
+.key {
+	/* The map's grid cell, at its bottom left. */
+	grid-area: 1 / 1;
+	align-self: end;
+	justify-self: start;
+	position: relative;
+	z-index: 1;
+	margin: 12px;
+	max-height: calc(100% - 24px);
+	overflow-y: auto;
+	padding: 0 12px;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	box-shadow: 0 1px 3px rgb(15 23 42 / 0.12);
+	font-size: 14px;
+}
+.key summary {
+	min-height: 44px;
+	display: flex;
+	align-items: center;
+	font-weight: 600;
+	cursor: pointer;
+}
+.key summary:focus-visible {
+	outline: 3px solid var(--accent);
+	outline-offset: 2px;
+}
+.key ul {
+	margin: 0 0 10px;
+	padding: 0;
+	list-style: none;
+}
+.key li {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 2px 0;
+}
+.key .swatch {
+	flex: none;
+	width: 16px;
+	height: 12px;
+	border: 1px solid var(--muted);
+	border-radius: 2px;
 }

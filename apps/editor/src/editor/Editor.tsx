@@ -10,6 +10,7 @@ import {
 import { useStore } from "zustand";
 import { api, type Category, type MapDetails } from "../api.ts";
 import { deleteSelection, mergeSelection } from "./actions.ts";
+import { Legend } from "./Legend.tsx";
 import { LevelCanvas } from "./LevelCanvas.tsx";
 import { LevelPanel } from "./LevelPanel.tsx";
 import { PublishPanel } from "./PublishPanel.tsx";
@@ -506,6 +507,10 @@ export function Editor({ map, initial, onExit }: EditorProps) {
 					listingNames={listingNames}
 					underlay={underlay}
 					underlayOpacity={opacity}
+				/>
+				<Legend
+					kinds={spaces.map((s) => s.kind)}
+					overlapping={overlaps.length > 0}
 				/>
 				{shownEmbed && (
 					<PublishPanel

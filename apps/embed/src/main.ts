@@ -1,6 +1,7 @@
 import {
 	BUNDLE_FORMAT_VERSION,
 	type DirectoryEntry,
+	legendFor,
 	type PublishedBundle,
 	type PublishedListing,
 	SPACE_KIND_COLOURS,
@@ -32,6 +33,8 @@ const count = element<HTMLParagraphElement>("results-count");
 const heading = element<HTMLHeadingElement>("directory-heading");
 const details = element<HTMLElement>("details");
 const levelSwitcher = element<HTMLElement>("levels");
+const key = element<HTMLDetailsElement>("key");
+const keyEntries = element<HTMLUListElement>("key-entries");
 
 type PublishedLevel = PublishedBundle["levels"][number];
 
@@ -174,10 +177,31 @@ function show(bundle: PublishedBundle) {
 		new Marker({ element }).setLngLat(centreOf([feature])).addTo(map);
 	}
 
+	/** The key to the Space Kinds on the Level shown. */
+	const showKey = () => {
+		const entries = legendFor(
+			bundle.spaces.features
+				.filter((f) => f.properties.levelId === levelId)
+				.map((f) => f.properties.kind),
+		);
+		keyEntries.replaceChildren(
+			...entries.map((entry) => {
+				const item = el("li", entry.label);
+				const swatch = el("span", undefined, "swatch");
+				swatch.style.background = entry.colour;
+				item.prepend(swatch);
+				return item;
+			}),
+		);
+		key.hidden = entries.length === 0;
+	};
+	showKey();
+
 	/** Shows one Level's Spaces and labels; every Level shares the Building's plane, so the view stays put. */
 	const showLevel = (id: string) => {
 		if (id === levelId || !levelNames.has(id)) return;
 		levelId = id;
+		showKey();
 		const filter: ExpressionSpecification = ["==", ["get", "levelId"], id];
 		map.setFilter("space-fill", filter);
 		map.setFilter("space-outline", filter);
